@@ -25,14 +25,12 @@
     </section>
     <section class="section docs-copy">
       <h2>Package layout</h2>
-      <pre><code>my-mod-1.0.0.zip
+      <p>Native Obsidian plugins use the smallest package shape:</p>
+      <pre><code>my-native-mod-1.0.0.zip
 ├── obsidian-mod.json
-└── payload/
-    ├── ue4ss/
-    │   └── Mods/MyMod/...
-    └── paks/
-        └── MyMod_P.pak</code></pre>
+└── MyNativeMod.dll</code></pre>
 
+      <p>PAK/IoStore and UE4SS packages are also supported. The manager detects their runtime files and places them in the correct game directories.</p>
       <p>The manager verifies the catalog SHA-256 before extraction. Catalog builds must be hosted as GitHub Release assets in <code>mixutin/ObsidianMods-Builds</code>.</p>
 
       <h2>Manifest</h2>
@@ -42,7 +40,7 @@
   "name": "My Mod",
   "version": "1.0.0",
   "author": "Author",
-  "loader": "pak",
+  "loader": "obsidian-native",
   "game": "minecraft-dungeons-2",
   "game_builds": ["25041023"],
   "dependencies": [],

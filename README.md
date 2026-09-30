@@ -19,7 +19,7 @@ The Rust desktop manager currently supports:
 
 - Minecraft Dungeons II Steam auto-detection
 - Windows and Linux
-- UE4SS and PAK/UTOC/UCAS mods
+- Obsidian native plugins, UE4SS mods and PAK/UTOC/UCAS mods
 - Discover catalog backed by the Obsidian Mods website
 - SHA-256 verified one-click installation
 - obsidianmods://install/<id> website deep links
@@ -49,5 +49,7 @@ Catalog packages must use HTTPS and publish a SHA-256 hash. The desktop manager 
 ## In-game menu
 
 Obsidian Native Runtime is a binary-only component that loads inside Minecraft Dungeons II and renders the F8 menu directly into the game's DirectX swap chain. It is independent of UE4SS, so the menu can still report UE4SS loader failures instead of disappearing with them.
+
+Runtime 0.2 introduces the Obsidian native plugin ABI. Native mods are independent DLL packages loaded from `ObsidianMods/Plugins`, can be enabled or disabled by the manager, and report their initialization health directly in the F8 menu.
 
 The runtime source and individual mod implementation source stay in the private build repository. Public releases contain only compiled runtime/mod builds, metadata, third-party license notices and checksums.
