@@ -1,5 +1,22 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-30T18:35:00+03:00",
-  "mods": []
+  "generated_at": "2026-09-30T19:07:29+03:00",
+  "mods": [
+    {
+      "id": "cutscene-fps-unlock",
+      "name": "Cutscene FPS Unlock",
+      "version": "0.1.0",
+      "author": "Obsidian Mods",
+      "summary": "Unlock real-time cutscene frame caps in Minecraft Dungeons II.",
+      "description": "Removes the game's cutscene-specific FPS cap and keeps Unreal's global frame limiter uncapped.",
+      "category": "Performance",
+      "loader": "UE4SS",
+      "game_build": "25041023",
+      "download_url": "https://github.com/mixutin/ObsidianMods-Builds/releases/download/cutscene-fps-v0.1.0/CutsceneFPSUnlock-0.1.0.zip",
+      "sha256": "d9a62da20430ce9c24bd9ea81cbc72000e3cdc3f847167a307e89135add4d7c8",
+      "dependencies": ["UE4SS >= 3.0.1"],
+      "tags": ["FPS", "Cutscenes", "Performance", "Linux", "Windows"],
+      "featured": true
+    }
+  ]
 }
