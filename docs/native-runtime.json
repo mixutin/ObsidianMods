@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "0.1.1",
-  "download_url": "https://github.com/mixutin/ObsidianMods-Builds/releases/download/native-runtime-v0.1.1/ObsidianNativeRuntime-0.1.1.zip",
-  "sha256": "64a004e962086e46d7375d89a7a762a8aa9ba1d9dcbc1269b21108e3a4961e1e"
+  "version": "0.2.0",
+  "download_url": "https://github.com/mixutin/ObsidianMods-Builds/releases/download/native-runtime-v0.2.0/ObsidianNativeRuntime-0.2.0.zip",
+  "sha256": "d1e2b9074a14e2aa407607ccfe3d3dd0916288c70738568132a94d646bfc44e9"
 }

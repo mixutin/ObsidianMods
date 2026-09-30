@@ -10,7 +10,7 @@
     "name": { "type": "string", "minLength": 1 },
     "version": { "type": "string", "minLength": 1 },
     "author": { "type": "string", "minLength": 1 },
-    "loader": { "enum": ["pak", "iostore", "ue4ss-lua", "ue4ss-cpp"] },
+    "loader": { "enum": ["pak", "iostore", "obsidian-native", "ue4ss-lua", "ue4ss-cpp"] },
     "game": { "const": "minecraft-dungeons-2" },
     "game_builds": { "type": "array", "items": { "type": "string" } },
     "dependencies": { "type": "array", "items": { "type": "string" } },

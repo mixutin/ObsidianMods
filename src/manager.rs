@@ -17,7 +17,7 @@ const APP_ID: &str = "1912410";
 const GAME_NAME: &str = "Minecraft Dungeons II";
 const CATALOG_URL: &str = "https://mixutin.github.io/ObsidianMods/catalog.json";
 const NATIVE_RUNTIME_MANIFEST_URL: &str =
-    "https://mixutin.github.io/ObsidianMods/native-runtime.json";
+    "https://raw.githubusercontent.com/mixutin/ObsidianMods/main/docs/native-runtime.json";
 const TRUSTED_DOWNLOAD_PREFIX: &str =
     "https://github.com/mixutin/ObsidianMods-Builds/releases/download/";
 const MAX_DOWNLOAD_BYTES: u64 = 2 * 1024 * 1024 * 1024;
@@ -30,6 +30,7 @@ struct ModMeta {
     version: Option<String>,
     author: Option<String>,
     description: Option<String>,
+    loader: Option<String>,
 }
 
 #[derive(Clone, Deserialize, serde::Serialize)]
@@ -54,6 +55,9 @@ impl ModManager {
         let win64 = game.join("Dungeons/Binaries/Win64");
         let ue4ss_mods = win64.join("ue4ss/Mods");
         let ue4ss_mods_txt = ue4ss_mods.join("mods.txt");
+        let native_root = game.join("ObsidianMods");
+        let native_enabled = native_root.join("Plugins");
+        let native_disabled = native_root.join("Plugins.disabled");
         let paks = game.join("Dungeons/Content/Paks");
         let paks_enabled = paks.join("~mods");
         let paks_disabled = paks.join("~mods_disabled");
@@ -62,6 +66,8 @@ impl ModManager {
             .join("ObsidianMods");
 
         fs::create_dir_all(&data_root)?;
+        fs::create_dir_all(&native_enabled)?;
+        fs::create_dir_all(&native_disabled)?;
         fs::create_dir_all(&paks_enabled)?;
         fs::create_dir_all(&paks_disabled)?;
 
@@ -71,6 +77,8 @@ impl ModManager {
                 win64,
                 ue4ss_mods,
                 ue4ss_mods_txt,
+                native_enabled,
+                native_disabled,
                 paks_enabled,
                 paks_disabled,
             },
@@ -82,6 +90,8 @@ impl ModManager {
 
     pub fn scan(&self) -> Result<Vec<InstalledMod>> {
         let mut mods = Vec::new();
+        mods.extend(self.scan_native(&self.paths.native_enabled, true)?);
+        mods.extend(self.scan_native(&self.paths.native_disabled, false)?);
         mods.extend(self.scan_ue4ss()?);
         mods.extend(self.scan_paks(&self.paths.paks_enabled, true)?);
         mods.extend(self.scan_paks(&self.paths.paks_disabled, false)?);
@@ -105,6 +115,7 @@ impl ModManager {
 
         for item in mods {
             let kind = match item.kind {
+                ModKind::Native => "native",
                 ModKind::Ue4ss => "ue4ss",
                 ModKind::Pak => "pak",
             };
@@ -319,10 +330,14 @@ impl ModManager {
                 "Refusing an untrusted catalog download URL; Obsidian catalog builds must be hosted in mixutin/ObsidianMods-Builds releases"
             ));
         }
-        if item.loader.eq_ignore_ascii_case("ue4ss") && !self.ue4ss_installed() {
+        let loader = item.loader.to_ascii_lowercase();
+        if loader.starts_with("ue4ss") && !self.ue4ss_installed() {
             return Err(anyhow!(
                 "This mod requires UE4SS, but UE4SS is not installed"
             ));
+        }
+        if loader == "obsidian-native" {
+            self.ensure_native_runtime()?;
         }
 
         let downloads = self.data_root.join("downloads");
@@ -376,6 +391,53 @@ impl ModManager {
         }
 
         self.install_archive(&archive)
+    }
+
+    fn scan_native(&self, dir: &Path, enabled: bool) -> Result<Vec<InstalledMod>> {
+        let mut out = Vec::new();
+        if !dir.is_dir() {
+            return Ok(out);
+        }
+
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            if !entry.file_type()?.is_dir() {
+                continue;
+            }
+
+            let root = entry.path();
+            let folder = entry.file_name().to_string_lossy().to_string();
+            let meta = read_meta(&root);
+            let files: Vec<PathBuf> = WalkDir::new(&root)
+                .into_iter()
+                .filter_map(Result::ok)
+                .filter(|item| item.file_type().is_file())
+                .map(|item| item.into_path())
+                .filter(|path| {
+                    path.extension()
+                        .and_then(|value| value.to_str())
+                        .map(|value| value.eq_ignore_ascii_case("dll"))
+                        .unwrap_or(false)
+                })
+                .collect();
+
+            if files.is_empty() {
+                continue;
+            }
+
+            out.push(InstalledMod {
+                id: meta.id.unwrap_or_else(|| slugify(&folder)),
+                name: meta.name.unwrap_or_else(|| folder.clone()),
+                version: meta.version,
+                author: meta.author,
+                description: meta.description,
+                kind: ModKind::Native,
+                enabled,
+                root,
+                files,
+            });
+        }
+        Ok(out)
     }
 
     fn scan_ue4ss(&self) -> Result<Vec<InstalledMod>> {
@@ -549,6 +611,61 @@ impl ModManager {
         let package_meta = read_meta(&cache);
         let package_manifest = cache.join("obsidian-mod.json");
 
+        if package_meta.loader.as_deref() == Some("obsidian-native") {
+            let id = package_meta
+                .id
+                .clone()
+                .ok_or_else(|| anyhow!("Native Obsidian packages require an id"))?;
+            let display_name = package_meta.name.clone().unwrap_or_else(|| id.clone());
+
+            let dlls: Vec<PathBuf> = WalkDir::new(&cache)
+                .into_iter()
+                .filter_map(Result::ok)
+                .filter(|entry| entry.file_type().is_file())
+                .map(|entry| entry.into_path())
+                .filter(|path| {
+                    path.extension()
+                        .and_then(|value| value.to_str())
+                        .map(|value| value.eq_ignore_ascii_case("dll"))
+                        .unwrap_or(false)
+                })
+                .collect();
+            if dlls.is_empty() {
+                let _ = fs::remove_dir_all(&cache);
+                return Err(anyhow!("Native Obsidian package contains no plugin DLL"));
+            }
+
+            let enabled_dest = self.paths.native_enabled.join(&id);
+            let disabled_dest = self.paths.native_disabled.join(&id);
+            let was_disabled = disabled_dest.is_dir() && !enabled_dest.exists();
+            let dest = if was_disabled {
+                &disabled_dest
+            } else {
+                &enabled_dest
+            };
+
+            for old in [&enabled_dest, &disabled_dest] {
+                if old.is_dir() {
+                    self.backup_path(old, &format!("{id}-previous"))?;
+                    fs::remove_dir_all(old)?;
+                }
+            }
+            fs::create_dir_all(dest)?;
+
+            for source in dlls {
+                let name = source
+                    .file_name()
+                    .ok_or_else(|| anyhow!("Invalid native plugin filename"))?;
+                fs::copy(&source, dest.join(name))?;
+            }
+            if package_manifest.is_file() {
+                fs::copy(&package_manifest, dest.join("obsidian-mod.json"))?;
+            }
+
+            let _ = fs::remove_dir_all(&cache);
+            return Ok(vec![format!("{display_name} (Native)")]);
+        }
+
         let mut installed = Vec::new();
         let mut ue4ss_roots = Vec::<PathBuf>::new();
         for entry in WalkDir::new(&cache).into_iter().filter_map(Result::ok) {
@@ -692,6 +809,27 @@ impl ModManager {
     pub fn set_enabled(&self, item: &InstalledMod, enabled: bool) -> Result<()> {
         self.ensure_game_closed()?;
         match item.kind {
+            ModKind::Native => {
+                let dest_root = if enabled {
+                    &self.paths.native_enabled
+                } else {
+                    &self.paths.native_disabled
+                };
+                fs::create_dir_all(dest_root)?;
+                let folder = item
+                    .root
+                    .file_name()
+                    .ok_or_else(|| anyhow!("Invalid native mod directory"))?;
+                let dest = dest_root.join(folder);
+                if dest.exists() {
+                    return Err(anyhow!(
+                        "Cannot change native mod state because {} already exists",
+                        dest.display()
+                    ));
+                }
+                fs::rename(&item.root, dest)?;
+                Ok(())
+            }
             ModKind::Ue4ss => self.set_ue4ss_state(
                 item.root
                     .file_name()
@@ -721,6 +859,11 @@ impl ModManager {
         self.ensure_game_closed()?;
         self.backup_mod(item)?;
         match item.kind {
+            ModKind::Native => {
+                if item.root.is_dir() {
+                    fs::remove_dir_all(&item.root)?;
+                }
+            }
             ModKind::Ue4ss => {
                 if item.root.is_dir() {
                     fs::remove_dir_all(&item.root)?;
@@ -747,6 +890,7 @@ impl ModManager {
     fn backup_mod(&self, item: &InstalledMod) -> Result<()> {
         let base = self.backup_dir(&item.name)?;
         match item.kind {
+            ModKind::Native => copy_dir(&item.root, &base.join("mod"))?,
             ModKind::Ue4ss => copy_dir(&item.root, &base.join("mod"))?,
             ModKind::Pak => {
                 fs::create_dir_all(&base)?;

@@ -1,32 +1,33 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-30T20:08:03+03:00",
+  "generated_at": "2026-09-30T22:39:44+03:00",
   "mods": [
     {
       "id": "cutscene-fps-unlock",
       "name": "Cutscene FPS Unlock",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": "Obsidian Mods",
-      "summary": "Unlock real-time cutscene frame caps in Minecraft Dungeons II.",
-      "description": "Removes the game's cutscene-specific FPS cap and keeps Unreal's global frame limiter uncapped.",
+      "summary": "Native FPS unlock for Minecraft Dungeons II gameplay and cutscenes.",
+      "description": "Uses the Obsidian Native Runtime to intercept the game frame-rate limit getter/setter without relying on UE4SS.",
       "category": "Performance",
-      "loader": "UE4SS",
+      "loader": "obsidian-native",
       "game_build": "25041023",
-      "download_url": "https://github.com/mixutin/ObsidianMods-Builds/releases/download/cutscene-fps-v0.1.0/CutsceneFPSUnlock-0.1.0.zip",
-      "sha256": "d9a62da20430ce9c24bd9ea81cbc72000e3cdc3f847167a307e89135add4d7c8",
+      "download_url": "https://github.com/mixutin/ObsidianMods-Builds/releases/download/cutscene-fps-native-v0.2.0/CutsceneFPSUnlock-Native-0.2.0.zip",
+      "sha256": "d795afcc632263da0e12b716acacd4d70b5b6217472e7fbb1352adda784fbf86",
       "dependencies": [
-        "UE4SS >= 3.0.1"
+        "Obsidian Native Runtime >= 0.2.0"
       ],
       "tags": [
         "FPS",
         "Cutscenes",
         "Performance",
+        "Native",
         "Linux",
         "Windows"
       ],
       "featured": true,
-      "status": "blocked",
-      "status_note": "Temporarily blocked: the current UE4SS 3.0.1 build crashes during Unreal Engine 5.6 initialization on this Dungeons II build.",
+      "status": "experimental",
+      "status_note": "Native preview: removes the UGameUserSettings frame-rate limit without UE4SS; cutscene behavior is being validated.",
       "screenshots": []
     }
   ]

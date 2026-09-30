@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ModKind {
+    Native,
     Ue4ss,
     Pak,
 }
@@ -10,6 +11,7 @@ pub enum ModKind {
 impl ModKind {
     pub fn label(&self) -> &'static str {
         match self {
+            Self::Native => "Native",
             Self::Ue4ss => "UE4SS",
             Self::Pak => "PAK",
         }
@@ -35,6 +37,8 @@ pub struct GamePaths {
     pub win64: PathBuf,
     pub ue4ss_mods: PathBuf,
     pub ue4ss_mods_txt: PathBuf,
+    pub native_enabled: PathBuf,
+    pub native_disabled: PathBuf,
     pub paks_enabled: PathBuf,
     pub paks_disabled: PathBuf,
 }

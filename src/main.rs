@@ -761,6 +761,9 @@ impl eframe::App for ObsidianApp {
                                                 egui::RichText::new(&item.name).size(17.0).strong(),
                                             );
                                             let color = match item.kind {
+                                                ModKind::Native => {
+                                                    egui::Color32::from_rgb(117, 214, 140)
+                                                }
                                                 ModKind::Ue4ss => {
                                                     egui::Color32::from_rgb(166, 126, 255)
                                                 }
