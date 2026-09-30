@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Obsidian Mods binary package format.">
+  <title>Package Format · Obsidian Mods</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="./"><span class="gem">◆</span> Obsidian <b>Mods</b></a>
+    <nav>
+      <a href="discover.html">Discover</a>
+      <a href="manager.html">Manager</a>
+      <a href="overlay.html">Overlay</a>
+      <a class="active" href="package-format.html">Packaging</a>
+    </nav>
+  </header>
+  <main>
+    <section class="page-hero compact">
+      <div class="eyebrow">OBSIDIAN PACKAGE FORMAT</div>
+      <h1>Ship the build.<br><span>Keep your source.</span></h1>
+      <p>Obsidian packages contain runtime files and metadata. A mod author does not need to publish implementation source.</p>
+    </section>
+    <section class="section docs-copy">
+      <h2>Package layout</h2>
+      <pre><code>my-mod-1.0.0.zip
+├── obsidian-mod.json
+└── payload/
+    ├── ue4ss/
+    │   └── Mods/MyMod/...
+    └── paks/
+        └── MyMod_P.pak</code></pre>
+
+      <p>The manager verifies the catalog SHA-256 before extraction. Catalog builds must be hosted as GitHub Release assets in <code>mixutin/ObsidianMods-Builds</code>.</p>
+
+      <h2>Manifest</h2>
+      <pre><code>{
+  "schema": 1,
+  "id": "my-mod",
+  "name": "My Mod",
+  "version": "1.0.0",
+  "author": "Author",
+  "loader": "pak",
+  "game": "minecraft-dungeons-2",
+  "game_builds": ["25041023"],
+  "dependencies": [],
+  "conflicts": []
+}</code></pre>
+      <h2>Binary-only policy</h2>
+      <p>Public mod archives should contain only files required to run the mod: compiled DLLs, Lua bytecode, PAK/IoStore containers, metadata and required third-party license notices. Source may stay in a private repository.</p>
+
+      <h2>Catalog status</h2>
+      <p>Every release can be marked <b>stable</b>, <b>experimental</b> or <b>temporarily blocked</b>. Blocked builds remain visible for transparency, but one-click installation is disabled until compatibility is restored.</p>
+
+      <p><a class="secondary" href="package.schema.json">View JSON schema</a></p>
+    </section>
+  </main>
+  <footer>Obsidian Mods · Binary distribution without source-code lock-in.</footer>
+</body>
+</html>

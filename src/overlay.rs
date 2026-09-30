@@ -22,6 +22,7 @@ pub struct OverlayApp {
     manager: Option<ModManager>,
     _hotkeys: Option<GlobalHotKeyManager>,
     hotkey_id: u32,
+    hotkey_available: bool,
     visible: bool,
     last_refresh: Instant,
     mods: Vec<OverlayMod>,
@@ -38,15 +39,24 @@ impl OverlayApp {
         let hotkey = HotKey::new(None, Code::F8);
         let hotkey_id = hotkey.id();
         let hotkeys = GlobalHotKeyManager::new().ok();
-        if let Some(manager) = hotkeys.as_ref() {
-            let _ = manager.register(hotkey);
+        let hotkey_available = hotkeys
+            .as_ref()
+            .map(|manager| manager.register(hotkey).is_ok())
+            .unwrap_or(false);
+
+        if !hotkey_available {
+            cc.egui_ctx
+                .send_viewport_cmd(egui::ViewportCommand::Decorations(true));
+            cc.egui_ctx
+                .send_viewport_cmd(egui::ViewportCommand::Visible(true));
         }
 
         let mut app = Self {
             manager: ModManager::detect().ok(),
             _hotkeys: hotkeys,
             hotkey_id,
-            visible: start_visible,
+            hotkey_available,
+            visible: start_visible || !hotkey_available,
             last_refresh: Instant::now() - Duration::from_secs(5),
             mods: Vec::new(),
             loader_status: "Checking loader…".into(),
@@ -185,7 +195,21 @@ impl eframe::App for OverlayApp {
                             .color(egui::Color32::from_rgb(166, 120, 255)),
                     );
                     ui.separator();
-                    ui.label(egui::RichText::new("F8 to close").weak());
+                    ui.label(
+                        egui::RichText::new(if self.hotkey_available {
+                            "F8 to close"
+                        } else {
+                            "Global F8 unavailable · window fallback"
+                        })
+                        .weak(),
+                    );
+                    if !self.hotkey_available {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.button("Close").clicked() {
+                                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                            }
+                        });
+                    }
                 });
                 ui.add_space(8.0);
                 let status_color = if self.loader_ok {

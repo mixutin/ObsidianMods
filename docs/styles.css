@@ -276,3 +276,17 @@ select {
   .overlay-layout, .mod-hero, .mod-columns { grid-template-columns: 1fr; }
   .gallery-grid { grid-template-columns: 1fr; }
 }
+
+.docs-copy { max-width: 900px; }
+.docs-copy h2 { margin-top: 44px; font-size: 28px; }
+.docs-copy p { color: var(--muted); font-size: 16px; }
+.docs-copy pre {
+  overflow-x: auto;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #08080c;
+  color: #d9d2e8;
+  line-height: 1.5;
+}
+.docs-copy code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

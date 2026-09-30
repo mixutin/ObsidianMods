@@ -14,6 +14,10 @@ use walkdir::WalkDir;
 const APP_ID: &str = "1912410";
 const GAME_NAME: &str = "Minecraft Dungeons II";
 const CATALOG_URL: &str = "https://mixutin.github.io/ObsidianMods/catalog.json";
+const TRUSTED_DOWNLOAD_PREFIX: &str =
+    "https://github.com/mixutin/ObsidianMods-Builds/releases/download/";
+const MAX_DOWNLOAD_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+const MAX_EXTRACTED_BYTES: u64 = 8 * 1024 * 1024 * 1024;
 
 #[derive(Default, Deserialize)]
 struct ModMeta {
@@ -158,8 +162,10 @@ impl ModManager {
                     .unwrap_or("the current game build is not supported")
             ));
         }
-        if !item.download_url.starts_with("https://") {
-            return Err(anyhow!("Refusing a non-HTTPS mod download"));
+        if !item.download_url.starts_with(TRUSTED_DOWNLOAD_PREFIX) {
+            return Err(anyhow!(
+                "Refusing an untrusted catalog download URL; Obsidian catalog builds must be hosted in mixutin/ObsidianMods-Builds releases"
+            ));
         }
         if item.loader.eq_ignore_ascii_case("ue4ss") && !self.ue4ss_installed() {
             return Err(anyhow!(
@@ -171,18 +177,35 @@ impl ModManager {
         fs::create_dir_all(&downloads)?;
         let archive = downloads.join(format!("{}-{}.zip", item.id, item.version));
         let response = ureq::get(&item.download_url)
-            .set("User-Agent", "ObsidianModsManager/0.2")
+            .set("User-Agent", "ObsidianModsManager/0.3")
             .call()
             .with_context(|| format!("Could not download {}", item.name))?;
-        let mut reader = response.into_reader();
+        if let Some(length) = response
+            .header("Content-Length")
+            .and_then(|value| value.parse::<u64>().ok())
+        {
+            if length > MAX_DOWNLOAD_BYTES {
+                return Err(anyhow!(
+                    "Refusing {} because the download is larger than 2 GiB",
+                    item.name
+                ));
+            }
+        }
+        let mut reader = response.into_reader().take(MAX_DOWNLOAD_BYTES + 1);
         let mut file = File::create(&archive)?;
         let mut hasher = Sha256::new();
         let mut buf = [0u8; 64 * 1024];
+        let mut downloaded = 0u64;
 
         loop {
             let n = reader.read(&mut buf)?;
             if n == 0 {
                 break;
+            }
+            downloaded += n as u64;
+            if downloaded > MAX_DOWNLOAD_BYTES {
+                let _ = fs::remove_file(&archive);
+                return Err(anyhow!("Refusing a mod download larger than 2 GiB"));
             }
             hasher.update(&buf[..n]);
             file.write_all(&buf[..n])?;
@@ -294,6 +317,7 @@ impl ModManager {
     }
 
     pub fn install_archive(&self, archive_path: &Path) -> Result<Vec<String>> {
+        self.ensure_game_closed()?;
         if archive_path
             .extension()
             .and_then(|x| x.to_str())
@@ -422,6 +446,7 @@ impl ModManager {
     }
 
     pub fn set_enabled(&self, item: &InstalledMod, enabled: bool) -> Result<()> {
+        self.ensure_game_closed()?;
         match item.kind {
             ModKind::Ue4ss => self.set_ue4ss_state(
                 item.root
@@ -449,6 +474,7 @@ impl ModManager {
     }
 
     pub fn uninstall(&self, item: &InstalledMod) -> Result<()> {
+        self.ensure_game_closed()?;
         self.backup_mod(item)?;
         match item.kind {
             ModKind::Ue4ss => {
@@ -571,14 +597,33 @@ impl ModManager {
         self.paths.win64.join("ue4ss/UE4SS.dll").is_file()
     }
 
+    pub fn game_running(&self) -> bool {
+        game_process_running()
+    }
+
+    fn ensure_game_closed(&self) -> Result<()> {
+        if self.game_running() {
+            return Err(anyhow!(
+                "Minecraft Dungeons II is running. Close the game before changing installed mods."
+            ));
+        }
+        Ok(())
+    }
+
     pub fn vanilla_mode(&self) -> bool {
         self.paths
             .win64
             .join("dwmapi.obsidian-disabled.dll")
             .is_file()
+            || self
+                .paths
+                .paks_enabled
+                .with_file_name("~mods.obsidian-disabled")
+                .is_dir()
     }
 
     pub fn set_vanilla_mode(&self, enabled: bool) -> Result<()> {
+        self.ensure_game_closed()?;
         let proxy = self.paths.win64.join("dwmapi.dll");
         let disabled_proxy = self.paths.win64.join("dwmapi.obsidian-disabled.dll");
         let disabled_paks = self
@@ -587,7 +632,7 @@ impl ModManager {
             .with_file_name("~mods.obsidian-disabled");
 
         if enabled {
-            if proxy.is_file() && !disabled_proxy.exists() {
+            if self.ue4ss_installed() && proxy.is_file() && !disabled_proxy.exists() {
                 fs::rename(&proxy, &disabled_proxy)?;
             }
             if self.paths.paks_enabled.is_dir() && !disabled_paks.exists() {
@@ -632,6 +677,9 @@ impl ModManager {
             if let Ok(exe) = std::env::current_exe() {
                 let _ = Command::new(exe).arg("--overlay").spawn();
             }
+        }
+        if self.game_running() {
+            return Ok(());
         }
         open_uri(&format!("steam://rungameid/{APP_ID}"))
     }
@@ -712,6 +760,18 @@ fn detect_game_dir() -> Option<PathBuf> {
 fn extract_zip(path: &Path, dest: &Path) -> Result<()> {
     let file = File::open(path).with_context(|| format!("Could not open {}", path.display()))?;
     let mut archive = zip::ZipArchive::new(file)?;
+
+    let mut extracted_size = 0u64;
+    for i in 0..archive.len() {
+        let entry = archive.by_index(i)?;
+        extracted_size = extracted_size.saturating_add(entry.size());
+        if extracted_size > MAX_EXTRACTED_BYTES {
+            return Err(anyhow!(
+                "Refusing archive because its extracted size exceeds 8 GiB"
+            ));
+        }
+    }
+
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i)?;
         let Some(rel) = entry.enclosed_name() else {
@@ -780,6 +840,21 @@ fn epoch() -> u64 {
         .unwrap_or_default()
         .as_secs()
 }
+fn game_process_running() -> bool {
+    let system = System::new_all();
+    system.processes().values().any(|process| {
+        let name = process.name().to_string_lossy().to_ascii_lowercase();
+        if name.contains("dungeons-win64-shipping") || name == "dungeons.exe" {
+            return true;
+        }
+        process.cmd().iter().any(|arg| {
+            let arg = arg.to_string_lossy().to_ascii_lowercase();
+            arg.contains("dungeons-win64-shipping.exe")
+                || arg.ends_with("minecraft dungeons ii/dungeons.exe")
+        })
+    })
+}
+
 fn overlay_running() -> bool {
     let system = System::new_all();
     system.processes().values().any(|process| {

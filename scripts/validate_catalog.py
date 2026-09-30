@@ -10,6 +10,9 @@ CATALOG = ROOT / "docs" / "catalog.json"
 ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 SHA_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 STATUSES = {"stable", "experimental", "blocked"}
+TRUSTED_DOWNLOAD_PREFIX = (
+    "https://github.com/mixutin/ObsidianMods-Builds/releases/download/"
+)
 
 def fail(message):
     print(f"catalog: {message}", file=sys.stderr)
@@ -53,6 +56,8 @@ def main():
 
         if not https_url(mod["download_url"]):
             ok &= fail(f"{prefix}: download_url must use HTTPS")
+        elif not mod["download_url"].startswith(TRUSTED_DOWNLOAD_PREFIX):
+            ok &= fail(f"{prefix}: download_url must use ObsidianMods-Builds releases")
         if not isinstance(mod["sha256"], str) or not SHA_RE.fullmatch(mod["sha256"]):
             ok &= fail(f"{prefix}: sha256 must contain exactly 64 hex characters")
 
