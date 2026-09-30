@@ -1,4 +1,6 @@
-use crate::model::{Catalog, CatalogMod, GamePaths, InstalledMod, ModKind, ModProfile};
+use crate::model::{
+    Catalog, CatalogMod, GamePaths, InstalledMod, ModKind, ModProfile, NativeRuntimeManifest,
+};
 use anyhow::{Context, Result, anyhow};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -14,6 +16,8 @@ use walkdir::WalkDir;
 const APP_ID: &str = "1912410";
 const GAME_NAME: &str = "Minecraft Dungeons II";
 const CATALOG_URL: &str = "https://mixutin.github.io/ObsidianMods/catalog.json";
+const NATIVE_RUNTIME_MANIFEST_URL: &str =
+    "https://mixutin.github.io/ObsidianMods/native-runtime.json";
 const TRUSTED_DOWNLOAD_PREFIX: &str =
     "https://github.com/mixutin/ObsidianMods-Builds/releases/download/";
 const MAX_DOWNLOAD_BYTES: u64 = 2 * 1024 * 1024 * 1024;
@@ -182,6 +186,109 @@ impl ModManager {
             fs::remove_file(path)?;
         }
         Ok(())
+    }
+
+    pub fn native_runtime_installed(&self) -> bool {
+        let active_proxy = self.paths.win64.join("dwmapi.dll");
+        let disabled_proxy = self.paths.win64.join("dwmapi.obsidian-disabled.dll");
+        self.paths.win64.join("ObsidianRuntime.dll").is_file()
+            && (active_proxy.is_file() || disabled_proxy.is_file())
+    }
+
+    pub fn native_runtime_version(&self) -> Option<String> {
+        fs::read_to_string(self.paths.game.join("ObsidianMods/runtime-version.txt"))
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+    }
+
+    fn fetch_native_runtime_manifest(&self) -> Result<NativeRuntimeManifest> {
+        let response = ureq::get(NATIVE_RUNTIME_MANIFEST_URL)
+            .set("User-Agent", "ObsidianModsManager/0.3")
+            .call()
+            .context("Could not reach the Obsidian Native Runtime manifest")?;
+        let manifest: NativeRuntimeManifest = serde_json::from_str(&response.into_string()?)?;
+        if manifest.schema != 1 {
+            return Err(anyhow!(
+                "Unsupported native runtime manifest schema {}",
+                manifest.schema
+            ));
+        }
+        if !manifest.download_url.starts_with(TRUSTED_DOWNLOAD_PREFIX) {
+            return Err(anyhow!("Refusing an untrusted native runtime download URL"));
+        }
+        Ok(manifest)
+    }
+
+    pub fn ensure_native_runtime(&self) -> Result<bool> {
+        self.ensure_game_closed()?;
+        if self.vanilla_mode() {
+            return Err(anyhow!(
+                "Switch to Modded mode before installing or updating the in-game runtime"
+            ));
+        }
+
+        let manifest = self.fetch_native_runtime_manifest()?;
+        if self.native_runtime_installed()
+            && self.native_runtime_version().as_deref() == Some(manifest.version.as_str())
+        {
+            return Ok(false);
+        }
+
+        let downloads = self.data_root.join("downloads");
+        fs::create_dir_all(&downloads)?;
+        let archive = downloads.join(format!("ObsidianNativeRuntime-{}.zip", manifest.version));
+        download_verified_file(&manifest.download_url, &manifest.sha256, &archive)?;
+
+        let cache = self.data_root.join("cache").join(format!(
+            "runtime-{}-{}",
+            unique_stamp(),
+            std::process::id()
+        ));
+        fs::create_dir_all(&cache)?;
+        extract_zip(&archive, &cache)?;
+
+        let proxy = find_named_file(&cache, "dwmapi.dll")
+            .ok_or_else(|| anyhow!("Native runtime package is missing dwmapi.dll"))?;
+        let runtime = find_named_file(&cache, "ObsidianRuntime.dll")
+            .ok_or_else(|| anyhow!("Native runtime package is missing ObsidianRuntime.dll"))?;
+
+        for existing in [
+            self.paths.win64.join("dwmapi.dll"),
+            self.paths.win64.join("ObsidianRuntime.dll"),
+        ] {
+            if existing.is_file() {
+                let label = existing
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or("native-runtime");
+                self.backup_path(&existing, label)?;
+            }
+        }
+
+        fs::copy(proxy, self.paths.win64.join("dwmapi.dll"))?;
+        fs::copy(runtime, self.paths.win64.join("ObsidianRuntime.dll"))?;
+
+        let state_dir = self.paths.game.join("ObsidianMods");
+        fs::create_dir_all(&state_dir)?;
+        fs::write(
+            state_dir.join("runtime-version.txt"),
+            format!("{}\n", manifest.version),
+        )?;
+
+        if let Some(metadata) = find_named_file(&cache, "obsidian-runtime.json") {
+            fs::copy(metadata, state_dir.join("native-runtime.json"))?;
+        }
+        if let Some(licenses) = find_named_dir(&cache, "THIRD_PARTY_LICENSES") {
+            let target = state_dir.join("THIRD_PARTY_LICENSES/native-runtime");
+            if target.exists() {
+                fs::remove_dir_all(&target)?;
+            }
+            copy_dir(&licenses, &target)?;
+        }
+
+        let _ = fs::remove_dir_all(&cache);
+        Ok(true)
     }
 
     pub fn fetch_catalog(&self) -> Result<Catalog> {
@@ -890,6 +997,82 @@ fn detect_game_dir() -> Option<PathBuf> {
         }
     }
     None
+}
+
+fn download_verified_file(url: &str, expected_sha256: &str, dest: &Path) -> Result<()> {
+    let response = ureq::get(url)
+        .set("User-Agent", "ObsidianModsManager/0.3")
+        .call()
+        .with_context(|| format!("Could not download {url}"))?;
+
+    if let Some(length) = response
+        .header("Content-Length")
+        .and_then(|value| value.parse::<u64>().ok())
+    {
+        if length > MAX_DOWNLOAD_BYTES {
+            return Err(anyhow!("Refusing a download larger than 2 GiB"));
+        }
+    }
+
+    let mut reader = response.into_reader().take(MAX_DOWNLOAD_BYTES + 1);
+    let mut output = File::create(dest)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    let mut downloaded = 0u64;
+
+    loop {
+        let count = reader.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        downloaded += count as u64;
+        if downloaded > MAX_DOWNLOAD_BYTES {
+            let _ = fs::remove_file(dest);
+            return Err(anyhow!("Refusing a download larger than 2 GiB"));
+        }
+        hasher.update(&buffer[..count]);
+        output.write_all(&buffer[..count])?;
+    }
+    output.flush()?;
+
+    let actual = hex::encode(hasher.finalize());
+    if !actual.eq_ignore_ascii_case(expected_sha256.trim()) {
+        let _ = fs::remove_file(dest);
+        return Err(anyhow!(
+            "SHA-256 mismatch (expected {}, got {})",
+            expected_sha256,
+            actual
+        ));
+    }
+    Ok(())
+}
+
+fn find_named_file(root: &Path, name: &str) -> Option<PathBuf> {
+    WalkDir::new(root)
+        .into_iter()
+        .filter_map(Result::ok)
+        .find(|entry| {
+            entry.file_type().is_file()
+                && entry
+                    .file_name()
+                    .to_string_lossy()
+                    .eq_ignore_ascii_case(name)
+        })
+        .map(|entry| entry.into_path())
+}
+
+fn find_named_dir(root: &Path, name: &str) -> Option<PathBuf> {
+    WalkDir::new(root)
+        .into_iter()
+        .filter_map(Result::ok)
+        .find(|entry| {
+            entry.file_type().is_dir()
+                && entry
+                    .file_name()
+                    .to_string_lossy()
+                    .eq_ignore_ascii_case(name)
+        })
+        .map(|entry| entry.into_path())
 }
 
 fn extract_zip(path: &Path, dest: &Path) -> Result<()> {

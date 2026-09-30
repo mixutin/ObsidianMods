@@ -26,7 +26,7 @@ The Rust desktop manager currently supports:
 - Enable, disable, uninstall and automatic backups
 - Saved mod profiles
 - Modded / Vanilla launch mode
-- F8 always-on-top mod-health overlay
+- F8 native in-game mod-health menu
 - Direct game launch
 
 ## Distribution targets
@@ -46,8 +46,8 @@ The AppImage is the distro-independent Linux build.
 
 Catalog packages must use HTTPS and publish a SHA-256 hash. The desktop manager downloads to its local cache, verifies the complete archive, and only then installs it.
 
-## In-game overlay
+## In-game menu
 
-The manager can launch an F8 overlay alongside Minecraft Dungeons II. It is a separate always-on-top process rather than an injected game component, so the Obsidian UI does not depend on UE4SS successfully initializing. The overlay reports managed mod state and loader failures while the game is running.
+Obsidian Native Runtime is a binary-only component that loads inside Minecraft Dungeons II and renders the F8 menu directly into the game's DirectX swap chain. It is independent of UE4SS, so the menu can still report UE4SS loader failures instead of disappearing with them.
 
-Experimental mod implementation source stays in the private build repository. Public mod releases contain only packaged builds, metadata and checksums. The public website never contains individual mod source code.
+The runtime source and individual mod implementation source stay in the private build repository. Public releases contain only compiled runtime/mod builds, metadata, third-party license notices and checksums.

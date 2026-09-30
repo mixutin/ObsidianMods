@@ -26,6 +26,7 @@ enum Action {
     SaveProfile,
     ApplyProfile(usize),
     DeleteProfile(usize),
+    InstallRuntime,
     SetVanilla(bool),
     Launch,
     OpenGame,
@@ -234,6 +235,23 @@ impl ObsidianApp {
                     }
                 }
             }
+            Action::InstallRuntime => {
+                if let Some(manager) = &self.manager {
+                    self.status = "Installing Obsidian Native Runtime…".into();
+                    match manager.ensure_native_runtime() {
+                        Ok(true) => {
+                            self.status = "Installed Obsidian F8 in-game menu".into();
+                            self.refresh();
+                        }
+                        Ok(false) => {
+                            self.status = "Obsidian Native Runtime is already current".into();
+                        }
+                        Err(err) => {
+                            self.status = format!("Native runtime install failed: {err}");
+                        }
+                    }
+                }
+            }
             Action::SetVanilla(enabled) => {
                 if let Some(m) = &self.manager {
                     match m.set_vanilla_mode(enabled) {
@@ -251,6 +269,17 @@ impl ObsidianApp {
             }
             Action::Launch => {
                 if let Some(m) = &self.manager {
+                    if !m.vanilla_mode() {
+                        if let Err(err) = m.ensure_native_runtime() {
+                            if !m.native_runtime_installed() {
+                                self.status = format!("Could not prepare in-game menu: {err}");
+                                return;
+                            }
+                            self.status = format!(
+                                "Runtime update unavailable; launching installed version: {err}"
+                            );
+                        }
+                    }
                     if let Err(e) = m.launch_game() {
                         self.status = format!("Could not launch game: {e}");
                     }
@@ -393,13 +422,53 @@ impl eframe::App for ObsidianApp {
                 ui.label(egui::RichText::new("Game detected").color(egui::Color32::from_rgb(117, 214, 140)).strong());
                 ui.small(manager.paths.game.display().to_string());
                 ui.add_space(10.0);
-                let ue4ss = manager.ue4ss_installed();
-                let color = if ue4ss {
+
+                let native_runtime = manager.native_runtime_installed();
+                let runtime_color = if native_runtime {
                     egui::Color32::from_rgb(117, 214, 140)
                 } else {
                     egui::Color32::from_rgb(235, 178, 82)
                 };
-                ui.label(egui::RichText::new(if ue4ss { "UE4SS detected" } else { "UE4SS not detected" }).color(color));
+                let runtime_label = manager
+                    .native_runtime_version()
+                    .map(|version| format!("F8 in-game menu · v{version}"))
+                    .unwrap_or_else(|| {
+                        if native_runtime {
+                            "F8 in-game menu · installed".into()
+                        } else {
+                            "F8 in-game menu · not installed".into()
+                        }
+                    });
+                ui.label(egui::RichText::new(runtime_label).color(runtime_color));
+
+                if !vanilla_mode && !manager.game_running() {
+                    if ui
+                        .small_button(if native_runtime {
+                            "Repair / update menu"
+                        } else {
+                            "Install in-game menu"
+                        })
+                        .clicked()
+                    {
+                        action = Some(Action::InstallRuntime);
+                    }
+                }
+
+                ui.add_space(7.0);
+                let ue4ss = manager.ue4ss_installed();
+                let color = if ue4ss {
+                    egui::Color32::from_rgb(117, 214, 140)
+                } else {
+                    egui::Color32::from_rgb(145, 140, 154)
+                };
+                ui.label(
+                    egui::RichText::new(if ue4ss {
+                        "Optional UE4SS loader detected"
+                    } else {
+                        "Optional UE4SS loader not installed"
+                    })
+                    .color(color),
+                );
             } else {
                 ui.colored_label(egui::Color32::from_rgb(235, 105, 105), "Game not detected");
             }
@@ -831,6 +900,18 @@ fn main() -> eframe::Result<()> {
     let args: Vec<String> = std::env::args().collect();
 
     register_protocol_handler();
+
+    if args.iter().any(|arg| arg == "--install-runtime") {
+        match ModManager::detect() {
+            Ok(manager) => match manager.ensure_native_runtime() {
+                Ok(true) => println!("Installed Obsidian Native Runtime"),
+                Ok(false) => println!("Obsidian Native Runtime is already current"),
+                Err(err) => eprintln!("Native runtime install failed: {err}"),
+            },
+            Err(err) => eprintln!("Game detection failed: {err}"),
+        }
+        return Ok(());
+    }
 
     if let Some(index) = args.iter().position(|arg| arg == "--install-zip") {
         if let Some(path) = args.get(index + 1) {

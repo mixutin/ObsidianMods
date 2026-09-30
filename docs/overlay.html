@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Obsidian Mods F8 overlay for Minecraft Dungeons II.">
-  <title>F8 Overlay · Obsidian Mods</title>
+  <meta name="description" content="Obsidian Mods native F8 in-game menu for Minecraft Dungeons II.">
+  <title>F8 In-Game Menu · Obsidian Mods</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body data-page="overlay">
@@ -13,21 +13,21 @@
     <nav>
       <a href="discover.html">Discover</a>
       <a href="manager.html">Manager</a>
-      <a class="active" href="overlay.html">Overlay</a>
+      <a class="active" href="overlay.html">In-Game Menu</a>
       <a href="https://github.com/mixutin/ObsidianMods">GitHub</a>
     </nav>
   </header>
   <main>
     <section class="page-hero">
-      <div class="eyebrow">F8 MOD HEALTH OVERLAY</div>
+      <div class="eyebrow">F8 NATIVE IN-GAME MENU</div>
       <h1>Know what <span>actually loaded.</span></h1>
-      <p>Obsidian runs a lightweight companion window over Dungeons II so mod status stays visible even when a game-side loader fails.</p>
+      <p>Obsidian Native Runtime renders the menu directly into Dungeons II's DirectX frame. Press F8 and the UI appears inside the game—no companion window and no alt-tab.</p>
     </section>
     <section class="section overlay-layout">
       <div>
         <div class="eyebrow">STATUS AT A GLANCE</div>
         <h2>Press F8. See the truth.</h2>
-        <p class="lead">The overlay distinguishes enabled, disabled, active and loader-failed states. PAK/IoStore mods are reported separately from runtime-loader mods.</p>
+        <p class="lead">The in-game menu distinguishes enabled, disabled, active and loader-failed states. PAK/IoStore mods are reported separately from runtime-loader mods.</p>
         <div class="status-demo">
           <div><span class="status-dot ok"></span><b>Performance Pack</b><small>Active · PAK/IoStore</small></div>
           <div><span class="status-dot warn"></span><b>Example Runtime Mod</b><small>Waiting for startup report</small></div>
@@ -35,13 +35,13 @@
         </div>
       </div>
       <div class="screenshot-frame pending-shot">
-        <div class="shot-label">Real F8 overlay screenshot will be captured after the current game session.</div>
+        <div class="shot-label">Real F8 in-game screenshot will be captured from the native runtime test build.</div>
       </div>
     </section>
     <section class="section feature-grid">
-      <article class="feature"><b>No Obsidian injection required</b><p>The UI is a companion process, keeping the manager usable when UE4SS itself is incompatible with a new game build.</p></article>
-      <article class="feature"><b>Global F8 toggle</b><p>Show or hide the overlay without tabbing out of the game.</p></article>
-      <article class="feature"><b>Loader diagnostics</b><p>Surface known loader initialization failures instead of silently claiming a mod is active.</p></article>
+      <article class="feature"><b>Native DirectX rendering</b><p>The private runtime hooks D3D12/D3D11 presentation and draws Dear ImGui inside the game's own swap chain.</p></article>
+      <article class="feature"><b>F8 toggle</b><p>Open or close Obsidian without leaving the game; input is captured by the menu while it is open.</p></article>
+      <article class="feature"><b>Independent diagnostics</b><p>The native runtime does not depend on UE4SS, so it can still report UE4SS startup failures.</p></article>
     </section>
   </main>
   <footer>Obsidian Mods · Community project · Not affiliated with Mojang or Microsoft.</footer>

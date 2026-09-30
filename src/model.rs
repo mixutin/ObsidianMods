@@ -78,3 +78,11 @@ pub struct ModProfile {
     pub name: String,
     pub mods: BTreeMap<String, bool>,
 }
+
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct NativeRuntimeManifest {
+    pub schema: u32,
+    pub version: String,
+    pub download_url: String,
+    pub sha256: String,
+}
