@@ -82,7 +82,42 @@ impl ModManager {
         mods.extend(self.scan_paks(&self.paths.paks_enabled, true)?);
         mods.extend(self.scan_paks(&self.paths.paks_disabled, false)?);
         mods.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        self.write_runtime_state(&mods)?;
         Ok(mods)
+    }
+
+    fn write_runtime_state(&self, mods: &[InstalledMod]) -> Result<()> {
+        let dir = self.paths.game.join("ObsidianMods");
+        fs::create_dir_all(&dir)?;
+        let mut state = String::from("schema|1\n");
+        state.push_str(&format!(
+            "mode|{}\n",
+            if self.vanilla_mode() {
+                "vanilla"
+            } else {
+                "modded"
+            }
+        ));
+
+        for item in mods {
+            let kind = match item.kind {
+                ModKind::Ue4ss => "ue4ss",
+                ModKind::Pak => "pak",
+            };
+            let clean = |value: &str| value.replace(['|', '\r', '\n'], " ");
+            state.push_str(&format!(
+                "mod|{}|{}|{}|{}|{}|{}\n",
+                clean(&item.id),
+                clean(&item.name),
+                clean(item.version.as_deref().unwrap_or("")),
+                kind,
+                if item.enabled { 1 } else { 0 },
+                clean(item.author.as_deref().unwrap_or(""))
+            ));
+        }
+
+        fs::write(dir.join("state.txt"), state)?;
+        Ok(())
     }
 
     pub fn profiles(&self) -> Result<Vec<ModProfile>> {
@@ -397,10 +432,11 @@ impl ModManager {
             ));
         }
 
-        let cache = self
-            .data_root
-            .join("cache")
-            .join(format!("install-{}", epoch()));
+        let cache = self.data_root.join("cache").join(format!(
+            "install-{}-{}",
+            unique_stamp(),
+            std::process::id()
+        ));
         fs::create_dir_all(&cache)?;
         extract_zip(archive_path, &cache)?;
         let package_meta = read_meta(&cache);
@@ -639,10 +675,12 @@ impl ModManager {
                 }
             })
             .collect();
-        let dir = self
-            .data_root
-            .join("backups")
-            .join(format!("{}-{}", epoch(), safe));
+        let dir = self.data_root.join("backups").join(format!(
+            "{}-{}-{}",
+            unique_stamp(),
+            std::process::id(),
+            safe
+        ));
         fs::create_dir_all(&dir)?;
         Ok(dir)
     }
@@ -775,11 +813,6 @@ impl ModManager {
     }
 
     pub fn launch_game(&self) -> Result<()> {
-        if !overlay_running() {
-            if let Ok(exe) = std::env::current_exe() {
-                let _ = Command::new(exe).arg("--overlay").spawn();
-            }
-        }
         if self.game_running() {
             return Ok(());
         }
@@ -936,11 +969,11 @@ fn slugify(value: &str) -> String {
     }
 }
 
-fn epoch() -> u64 {
+fn unique_stamp() -> u128 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
-        .as_secs()
+        .as_nanos()
 }
 fn game_process_running() -> bool {
     let system = System::new_all();
@@ -954,16 +987,6 @@ fn game_process_running() -> bool {
             arg.contains("dungeons-win64-shipping.exe")
                 || arg.ends_with("minecraft dungeons ii/dungeons.exe")
         })
-    })
-}
-
-fn overlay_running() -> bool {
-    let system = System::new_all();
-    system.processes().values().any(|process| {
-        process
-            .cmd()
-            .iter()
-            .any(|arg| arg.to_string_lossy() == "--overlay")
     })
 }
 

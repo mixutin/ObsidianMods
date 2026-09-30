@@ -1,6 +1,5 @@
 mod manager;
 mod model;
-mod overlay;
 
 use eframe::egui;
 use manager::ModManager;
@@ -830,14 +829,6 @@ fn register_protocol_handler() {
 
 fn main() -> eframe::Result<()> {
     let args: Vec<String> = std::env::args().collect();
-
-    if args
-        .iter()
-        .any(|arg| arg == "--overlay" || arg == "--overlay-open")
-    {
-        let start_visible = args.iter().any(|arg| arg == "--overlay-open");
-        return overlay::run(start_visible);
-    }
 
     register_protocol_handler();
 
