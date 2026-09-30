@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Obsidian Mods — one-click Minecraft Dungeons II mods and a cross-platform mod manager.">
+  <title>Obsidian Mods</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="#"><span class="gem">◆</span> Obsidian <b>Mods</b></a>
+    <nav>
+      <a href="#discover">Discover</a>
+      <a href="#manager">Manager</a>
+      <a href="https://github.com/mixutin/ObsidianMods">GitHub</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="eyebrow">MINECRAFT DUNGEONS II MODDING</div>
+      <h1>Mods without the<br><span>folder archaeology.</span></h1>
+      <p>Discover verified builds, install in one click, manage conflicts and see mod health in-game.</p>
+      <div class="actions">
+        <a class="primary" href="#manager">Get Obsidian Manager</a>
+        <a class="secondary" href="#discover">Browse mods</a>
+      </div>
+      <div class="trust">
+        <span>✓ SHA-256 verified</span>
+        <span>✓ Automatic backups</span>
+        <span>✓ Windows + Linux</span>
+      </div>
+    </section>
+
+    <section class="section" id="discover">
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">DISCOVER</div>
+          <h2>Built for Dungeons II.</h2>
+        </div>
+        <input id="search" type="search" placeholder="Search mods…">
+      </div>
+      <div id="mods" class="grid"></div>
+      <div id="empty" class="empty" hidden>No matching mods.</div>
+    </section>
+
+    <section class="section manager" id="manager">
+      <div class="manager-copy">
+        <div class="eyebrow">OBSIDIAN MODS MANAGER</div>
+        <h2>One manager. Every desktop.</h2>
+        <p>Native Rust client with automatic Steam detection, UE4SS + PAK support, profiles, backups and website deep links.</p>
+        <div class="platforms">
+          <span>Windows 10/11</span>
+          <span>Linux AppImage</span>
+          <span>Debian / Ubuntu</span>
+          <span>Fedora / RPM</span>
+          <span>Portable tar.gz</span>
+        </div>
+        <div class="actions">
+          <a class="primary" id="manager-download" href="https://github.com/mixutin/ObsidianMods/releases/latest">Download latest</a>
+          <a class="secondary" href="https://github.com/mixutin/ObsidianMods/releases">All builds</a>
+        </div>
+      </div>
+      <div class="mock">
+        <div class="mock-top"><span>◆ Obsidian Mods</span><span>Discover&nbsp;&nbsp; Installed</span></div>
+        <div class="mock-card">
+          <b>Cutscene FPS Unlock</b><span class="pill">PERFORMANCE</span>
+          <p>Unlock real-time cutscene frame caps.</p>
+          <button>Installed ✓</button>
+        </div>
+        <div class="mock-card">
+          <b>Obsidian Runtime</b><span class="pill">SYSTEM</span>
+          <p>In-game mod status and health panel.</p>
+          <button>Active ✓</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>Obsidian Mods · Community project · Not affiliated with Mojang or Microsoft.</footer>
+  <script src="app.js"></script>
+</body>
+</html>

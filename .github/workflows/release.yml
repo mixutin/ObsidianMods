@@ -1,0 +1,84 @@
+name: Build Obsidian Mods Manager
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build
+        run: cargo build --release
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item target/release/ObsidianModsManager.exe dist/ObsidianModsManager.exe
+          Compress-Archive -Path dist/* -DestinationPath ObsidianModsManager-Windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: ObsidianModsManager-Windows-x64.zip
+
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev libxkbcommon-dev libwayland-dev libgl1-mesa-dev ruby ruby-dev rpm libfuse2
+      - name: Build
+        run: cargo build --release
+      - name: Prepare package root
+        run: |
+          mkdir -p pkg/usr/bin pkg/usr/share/applications pkg/usr/share/icons/hicolor/scalable/apps
+          cp target/release/ObsidianModsManager pkg/usr/bin/obsidian-mods-manager
+          cp assets/obsidian-mods-manager.desktop pkg/usr/share/applications/
+          cp assets/obsidian-mods-manager.svg pkg/usr/share/icons/hicolor/scalable/apps/
+          tar -czf ObsidianModsManager-Linux-x64.tar.gz -C target/release ObsidianModsManager
+      - name: Build deb and rpm
+        run: |
+          sudo gem install fpm --no-document
+          fpm -s dir -t deb -n obsidian-mods-manager -v 0.2.0 --description "Obsidian Mods Manager for Minecraft Dungeons II" -C pkg .
+          fpm -s dir -t rpm -n obsidian-mods-manager -v 0.2.0 --description "Obsidian Mods Manager for Minecraft Dungeons II" -C pkg .
+          mv obsidian-mods-manager_0.2.0_amd64.deb ObsidianModsManager-Linux-x64.deb
+          mv obsidian-mods-manager-0.2.0-1.x86_64.rpm ObsidianModsManager-Linux-x64.rpm
+      - name: Build AppImage
+        run: |
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage
+          export APPIMAGE_EXTRACT_AND_RUN=1
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --executable target/release/ObsidianModsManager --desktop-file assets/obsidian-mods-manager.desktop --icon-file assets/obsidian-mods-manager.svg --output appimage
+          mv Obsidian_Mods_Manager*.AppImage ObsidianModsManager-Linux-x64.AppImage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64
+          path: |
+            ObsidianModsManager-Linux-x64.tar.gz
+            ObsidianModsManager-Linux-x64.deb
+            ObsidianModsManager-Linux-x64.rpm
+            ObsidianModsManager-Linux-x64.AppImage
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" artifacts/* --repo "${GITHUB_REPOSITORY}" --generate-notes

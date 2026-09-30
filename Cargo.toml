@@ -1,0 +1,21 @@
+[package]
+name = "ObsidianModsManager"
+version = "0.2.0"
+edition = "2024"
+description = "Obsidian Mods Manager for Minecraft Dungeons II"
+license = "MIT"
+repository = "https://github.com/mixutin/ObsidianMods"
+homepage = "https://mixutin.github.io/ObsidianMods/"
+
+[dependencies]
+anyhow = "1.0.104"
+dirs = "7.0.0"
+eframe = { version = "0.33.2", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+hex = "0.4.3"
+rfd = "0.17.2"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+sha2 = "0.11.0"
+ureq = { version = "2.12.1", default-features = false, features = ["tls", "gzip"] }
+walkdir = "2.5.0"
+zip = "8.6.0"
