@@ -19,13 +19,23 @@ const TRUSTED_DOWNLOAD_PREFIX: &str =
 const MAX_DOWNLOAD_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_EXTRACTED_BYTES: u64 = 8 * 1024 * 1024 * 1024;
 
-#[derive(Default, Deserialize)]
+#[derive(Clone, Default, Deserialize, serde::Serialize)]
 struct ModMeta {
     id: Option<String>,
     name: Option<String>,
     version: Option<String>,
     author: Option<String>,
     description: Option<String>,
+}
+
+#[derive(Clone, Deserialize, serde::Serialize)]
+struct StoredPakRecord {
+    id: String,
+    name: String,
+    version: Option<String>,
+    author: Option<String>,
+    description: Option<String>,
+    files: Vec<String>,
 }
 
 pub struct ModManager {
@@ -273,6 +283,50 @@ impl ModManager {
         Ok(out)
     }
 
+    fn pak_records(&self) -> Vec<StoredPakRecord> {
+        let dir = self.data_root.join("pak-records");
+        let Ok(entries) = fs::read_dir(dir) else {
+            return Vec::new();
+        };
+        entries
+            .filter_map(Result::ok)
+            .filter_map(|entry| fs::read_to_string(entry.path()).ok())
+            .filter_map(|text| serde_json::from_str::<StoredPakRecord>(&text).ok())
+            .collect()
+    }
+
+    fn save_pak_record(&self, meta: &ModMeta, files: Vec<String>) -> Result<()> {
+        let Some(id) = meta.id.clone() else {
+            return Ok(());
+        };
+        let dir = self.data_root.join("pak-records");
+        fs::create_dir_all(&dir)?;
+        let record = StoredPakRecord {
+            id: id.clone(),
+            name: meta.name.clone().unwrap_or_else(|| id.clone()),
+            version: meta.version.clone(),
+            author: meta.author.clone(),
+            description: meta.description.clone(),
+            files,
+        };
+        fs::write(
+            dir.join(format!("{}.json", slugify(&id))),
+            serde_json::to_string_pretty(&record)?,
+        )?;
+        Ok(())
+    }
+
+    fn remove_pak_record(&self, id: &str) -> Result<()> {
+        let path = self
+            .data_root
+            .join("pak-records")
+            .join(format!("{}.json", slugify(id)));
+        if path.is_file() {
+            fs::remove_file(path)?;
+        }
+        Ok(())
+    }
+
     fn scan_paks(&self, dir: &Path, enabled: bool) -> Result<Vec<InstalledMod>> {
         let mut groups: BTreeMap<String, Vec<PathBuf>> = BTreeMap::new();
         if !dir.is_dir() {
@@ -300,18 +354,32 @@ impl ModManager {
             let key = stem.trim_end_matches("_P").to_string();
             groups.entry(key).or_default().push(path);
         }
+        let records = self.pak_records();
         Ok(groups
             .into_iter()
-            .map(|(name, files)| InstalledMod {
-                id: slugify(&name),
-                name,
-                version: None,
-                author: None,
-                description: None,
-                kind: ModKind::Pak,
-                enabled,
-                root: dir.to_path_buf(),
-                files,
+            .map(|(name, files)| {
+                let record = records.iter().find(|record| {
+                    files.iter().any(|file| {
+                        file.file_name()
+                            .and_then(|value| value.to_str())
+                            .map(|filename| record.files.iter().any(|saved| saved == filename))
+                            .unwrap_or(false)
+                    })
+                });
+
+                InstalledMod {
+                    id: record
+                        .map(|record| record.id.clone())
+                        .unwrap_or_else(|| slugify(&name)),
+                    name: record.map(|record| record.name.clone()).unwrap_or(name),
+                    version: record.and_then(|record| record.version.clone()),
+                    author: record.and_then(|record| record.author.clone()),
+                    description: record.and_then(|record| record.description.clone()),
+                    kind: ModKind::Pak,
+                    enabled,
+                    root: dir.to_path_buf(),
+                    files,
+                }
             })
             .collect())
     }
@@ -335,6 +403,8 @@ impl ModManager {
             .join(format!("install-{}", epoch()));
         fs::create_dir_all(&cache)?;
         extract_zip(archive_path, &cache)?;
+        let package_meta = read_meta(&cache);
+        let package_manifest = cache.join("obsidian-mod.json");
 
         let mut installed = Vec::new();
         let mut ue4ss_roots = Vec::<PathBuf>::new();
@@ -380,6 +450,9 @@ impl ModManager {
                 fs::remove_dir_all(&dest)?;
             }
             copy_dir(&root, &dest)?;
+            if package_manifest.is_file() && !dest.join("obsidian-mod.json").is_file() {
+                fs::copy(&package_manifest, dest.join("obsidian-mod.json"))?;
+            }
             self.set_ue4ss_state(&name, true)?;
             installed.push(format!("{name} (UE4SS)"));
         }
@@ -422,6 +495,17 @@ impl ModManager {
             })
             .collect();
         if !pak_files.is_empty() {
+            let pak_names: Vec<String> = pak_files
+                .iter()
+                .filter_map(|source| source.file_name())
+                .map(|name| name.to_string_lossy().to_string())
+                .collect();
+            let old_record = package_meta.id.as_deref().and_then(|id| {
+                self.pak_records()
+                    .into_iter()
+                    .find(|record| record.id == id)
+            });
+
             fs::create_dir_all(&self.paths.paks_enabled)?;
             for source in pak_files {
                 let name = source
@@ -434,6 +518,23 @@ impl ModManager {
                 fs::copy(&source, &dest)?;
                 installed.push(name.to_string_lossy().to_string());
             }
+
+            if let Some(record) = old_record {
+                for old_name in record.files {
+                    if pak_names.iter().any(|new_name| new_name == &old_name) {
+                        continue;
+                    }
+                    for dir in [&self.paths.paks_enabled, &self.paths.paks_disabled] {
+                        let stale = dir.join(&old_name);
+                        if stale.is_file() {
+                            self.backup_path(&stale, &format!("{}-{old_name}", record.id))?;
+                            fs::remove_file(stale)?;
+                        }
+                    }
+                }
+            }
+
+            self.save_pak_record(&package_meta, pak_names)?;
         }
 
         let _ = fs::remove_dir_all(&cache);
@@ -494,6 +595,7 @@ impl ModManager {
                         fs::remove_file(file)?;
                     }
                 }
+                self.remove_pak_record(&item.id)?;
             }
         }
         Ok(())
@@ -887,4 +989,16 @@ fn open_uri(uri: &str) -> Result<()> {
         Command::new("xdg-open").arg(uri).spawn()?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::slugify;
+
+    #[test]
+    fn slugify_produces_catalog_safe_ids() {
+        assert_eq!(slugify("Cutscene FPS Unlock"), "cutscene-fps-unlock");
+        assert_eq!(slugify("  Better_HUD ++ "), "better-hud");
+        assert_eq!(slugify("***"), "mod");
+    }
 }

@@ -45,6 +45,23 @@ struct ObsidianApp {
     pending_remove: Option<usize>,
 }
 
+fn clean_version(value: &str) -> &str {
+    value.trim().trim_start_matches('v')
+}
+
+fn version_is_newer(available: &str, installed: Option<&str>) -> bool {
+    let Some(installed) = installed else {
+        return false;
+    };
+    match (
+        semver::Version::parse(clean_version(available)),
+        semver::Version::parse(clean_version(installed)),
+    ) {
+        (Ok(available), Ok(installed)) => available > installed,
+        _ => available != installed,
+    }
+}
+
 impl ObsidianApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let mut visuals = egui::Visuals::dark();
@@ -152,7 +169,7 @@ impl ObsidianApp {
                             .iter()
                             .find(|installed| installed.id == item.id)
                             .map(|installed| {
-                                installed.version.as_deref() != Some(item.version.as_str())
+                                version_is_newer(&item.version, installed.version.as_deref())
                             })
                             .unwrap_or(false)
                     })
@@ -408,7 +425,10 @@ impl eframe::App for ObsidianApp {
                             .iter()
                             .find(|installed| installed.id == item.id)
                             .map(|installed| {
-                                installed.version.as_deref() != Some(item.version.as_str())
+                                version_is_newer(
+                                    &item.version,
+                                    installed.version.as_deref(),
+                                )
                             })
                             .unwrap_or(false)
                     })
@@ -463,7 +483,16 @@ impl eframe::App for ObsidianApp {
                                         installed.version.as_deref() == Some(item.version.as_str())
                                     })
                                     .unwrap_or(false);
-                                let update_available = installed.is_some() && !installed_current;
+                                let update_available = installed
+                                    .map(|installed| {
+                                        version_is_newer(
+                                            &item.version,
+                                            installed.version.as_deref(),
+                                        )
+                                    })
+                                    .unwrap_or(false);
+                                let installed_ahead =
+                                    installed.is_some() && !installed_current && !update_available;
                                 egui::Frame::group(ui.style()).show(ui, |ui| {
                                     ui.horizontal(|ui| {
                                         ui.vertical(|ui| {
@@ -525,6 +554,13 @@ impl eframe::App for ObsidianApp {
                                                         egui::RichText::new("Installed ✓").color(
                                                             egui::Color32::from_rgb(117, 214, 140),
                                                         ),
+                                                    );
+                                                } else if installed_ahead {
+                                                    ui.label(
+                                                        egui::RichText::new("Installed newer")
+                                                            .color(egui::Color32::from_rgb(
+                                                                117, 214, 140,
+                                                            )),
                                                     );
                                                 } else if item.status.as_deref() == Some("blocked") {
                                                     ui.label(
@@ -896,4 +932,24 @@ fn main() -> eframe::Result<()> {
         options,
         Box::new(|cc| Ok(Box::new(ObsidianApp::new(cc)))),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::version_is_newer;
+
+    #[test]
+    fn update_detection_uses_semver_ordering() {
+        assert!(version_is_newer("1.2.0", Some("1.1.9")));
+        assert!(version_is_newer("v2.0.0", Some("1.99.0")));
+        assert!(!version_is_newer("1.0.0", Some("1.0.0")));
+        assert!(!version_is_newer("1.0.0", Some("2.0.0")));
+        assert!(!version_is_newer("1.0.0", None));
+    }
+
+    #[test]
+    fn non_semver_versions_only_update_when_different() {
+        assert!(version_is_newer("preview-b", Some("preview-a")));
+        assert!(!version_is_newer("preview-a", Some("preview-a")));
+    }
 }
