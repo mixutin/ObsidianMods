@@ -290,3 +290,24 @@ select {
   line-height: 1.5;
 }
 .docs-copy code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+.download-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 28px;
+}
+.download-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.download-card:hover { border-color: #6d5c91; background: #171721; }
+.download-card span { color: var(--muted); font-size: 12px; }
+@media (max-width: 850px) {
+  .download-grid { grid-template-columns: 1fr; }
+}

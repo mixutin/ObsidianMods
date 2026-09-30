@@ -23,6 +23,7 @@ enum Action {
     InstallCatalog(usize),
     Refresh,
     RefreshCatalog,
+    UpdateAll,
     SaveProfile,
     ApplyProfile(usize),
     DeleteProfile(usize),
@@ -140,6 +141,43 @@ impl ObsidianApp {
         match action {
             Action::Refresh => self.refresh(),
             Action::RefreshCatalog => self.refresh_catalog(),
+            Action::UpdateAll => {
+                let Some(manager) = &self.manager else { return };
+                let updates: Vec<CatalogMod> = self
+                    .catalog
+                    .iter()
+                    .filter(|item| item.status.as_deref() != Some("blocked"))
+                    .filter(|item| {
+                        self.mods
+                            .iter()
+                            .find(|installed| installed.id == item.id)
+                            .map(|installed| {
+                                installed.version.as_deref() != Some(item.version.as_str())
+                            })
+                            .unwrap_or(false)
+                    })
+                    .cloned()
+                    .collect();
+
+                if updates.is_empty() {
+                    self.status = "Everything is up to date".into();
+                } else {
+                    let mut updated = Vec::new();
+                    let mut failed = Vec::new();
+                    for item in updates {
+                        match manager.install_catalog_mod(&item) {
+                            Ok(_) => updated.push(item.name),
+                            Err(err) => failed.push(format!("{}: {}", item.name, err)),
+                        }
+                    }
+                    self.refresh();
+                    self.status = if failed.is_empty() {
+                        format!("Updated {}", updated.join(", "))
+                    } else {
+                        format!("Updated {} · Failed {}", updated.len(), failed.join("; "))
+                    };
+                }
+            }
             Action::Install(path) => self.install(&path),
             Action::InstallCatalog(index) => self.install_catalog(index),
             Action::SaveProfile => {
@@ -361,6 +399,21 @@ impl eframe::App for ObsidianApp {
             ui.add_space(12.0);
 
             if self.view == View::Discover {
+                let update_count = self
+                    .catalog
+                    .iter()
+                    .filter(|item| item.status.as_deref() != Some("blocked"))
+                    .filter(|item| {
+                        self.mods
+                            .iter()
+                            .find(|installed| installed.id == item.id)
+                            .map(|installed| {
+                                installed.version.as_deref() != Some(item.version.as_str())
+                            })
+                            .unwrap_or(false)
+                    })
+                    .count();
+
                 ui.horizontal(|ui| {
                     ui.heading("Discover");
                     ui.label(
@@ -369,6 +422,13 @@ impl eframe::App for ObsidianApp {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui.button("↻ Catalog").clicked() {
                             action = Some(Action::RefreshCatalog);
+                        }
+                        if update_count > 0
+                            && ui
+                                .button(format!("Update all ({update_count})"))
+                                .clicked()
+                        {
+                            action = Some(Action::UpdateAll);
                         }
                     });
                 });
@@ -394,10 +454,16 @@ impl eframe::App for ObsidianApp {
                         .auto_shrink([false, false])
                         .show(ui, |ui| {
                             for (index, item) in self.catalog.iter().enumerate() {
-                                let installed = self.mods.iter().any(|m| {
-                                    m.name.eq_ignore_ascii_case(&item.name)
-                                        && m.version.as_deref() == Some(item.version.as_str())
-                                });
+                                let installed = self
+                                    .mods
+                                    .iter()
+                                    .find(|installed| installed.id == item.id);
+                                let installed_current = installed
+                                    .map(|installed| {
+                                        installed.version.as_deref() == Some(item.version.as_str())
+                                    })
+                                    .unwrap_or(false);
+                                let update_available = installed.is_some() && !installed_current;
                                 egui::Frame::group(ui.style()).show(ui, |ui| {
                                     ui.horizontal(|ui| {
                                         ui.vertical(|ui| {
@@ -454,7 +520,7 @@ impl eframe::App for ObsidianApp {
                                         ui.with_layout(
                                             egui::Layout::right_to_left(egui::Align::Center),
                                             |ui| {
-                                                if installed {
+                                                if installed_current {
                                                     ui.label(
                                                         egui::RichText::new("Installed ✓").color(
                                                             egui::Color32::from_rgb(117, 214, 140),
@@ -467,7 +533,14 @@ impl eframe::App for ObsidianApp {
                                                                 235, 105, 105,
                                                             )),
                                                     );
-                                                } else if ui.button("Install").clicked() {
+                                                } else if ui
+                                                    .button(if update_available {
+                                                        "Update"
+                                                    } else {
+                                                        "Install"
+                                                    })
+                                                    .clicked()
+                                                {
                                                     action = Some(Action::InstallCatalog(index));
                                                 }
                                             },
@@ -720,7 +793,6 @@ fn register_protocol_handler() {
 }
 
 fn main() -> eframe::Result<()> {
-    register_protocol_handler();
     let args: Vec<String> = std::env::args().collect();
 
     if args
@@ -730,6 +802,8 @@ fn main() -> eframe::Result<()> {
         let start_visible = args.iter().any(|arg| arg == "--overlay-open");
         return overlay::run(start_visible);
     }
+
+    register_protocol_handler();
 
     if let Some(index) = args.iter().position(|arg| arg == "--install-zip") {
         if let Some(path) = args.get(index + 1) {
