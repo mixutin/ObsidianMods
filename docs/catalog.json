@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "generated_at": "2026-09-30T19:07:29+03:00",
+  "generated_at": "2026-09-30T20:08:03+03:00",
   "mods": [
     {
       "id": "cutscene-fps-unlock",
@@ -14,9 +14,20 @@
       "game_build": "25041023",
       "download_url": "https://github.com/mixutin/ObsidianMods-Builds/releases/download/cutscene-fps-v0.1.0/CutsceneFPSUnlock-0.1.0.zip",
       "sha256": "d9a62da20430ce9c24bd9ea81cbc72000e3cdc3f847167a307e89135add4d7c8",
-      "dependencies": ["UE4SS >= 3.0.1"],
-      "tags": ["FPS", "Cutscenes", "Performance", "Linux", "Windows"],
-      "featured": true
+      "dependencies": [
+        "UE4SS >= 3.0.1"
+      ],
+      "tags": [
+        "FPS",
+        "Cutscenes",
+        "Performance",
+        "Linux",
+        "Windows"
+      ],
+      "featured": true,
+      "status": "blocked",
+      "status_note": "Temporarily blocked: the current UE4SS 3.0.1 build crashes during Unreal Engine 5.6 initialization on this Dungeons II build.",
+      "screenshots": []
     }
   ]
 }

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Obsidian Mods F8 overlay for Minecraft Dungeons II.">
+  <title>F8 Overlay · Obsidian Mods</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="overlay">
+  <header class="nav">
+    <a class="brand" href="./"><span class="gem">◆</span> Obsidian <b>Mods</b></a>
+    <nav>
+      <a href="discover.html">Discover</a>
+      <a href="manager.html">Manager</a>
+      <a class="active" href="overlay.html">Overlay</a>
+      <a href="https://github.com/mixutin/ObsidianMods">GitHub</a>
+    </nav>
+  </header>
+  <main>
+    <section class="page-hero">
+      <div class="eyebrow">F8 MOD HEALTH OVERLAY</div>
+      <h1>Know what <span>actually loaded.</span></h1>
+      <p>Obsidian runs a lightweight companion window over Dungeons II so mod status stays visible even when a game-side loader fails.</p>
+    </section>
+    <section class="section overlay-layout">
+      <div>
+        <div class="eyebrow">STATUS AT A GLANCE</div>
+        <h2>Press F8. See the truth.</h2>
+        <p class="lead">The overlay distinguishes enabled, disabled, active and loader-failed states. PAK/IoStore mods are reported separately from runtime-loader mods.</p>
+        <div class="status-demo">
+          <div><span class="status-dot ok"></span><b>Performance Pack</b><small>Active · PAK/IoStore</small></div>
+          <div><span class="status-dot warn"></span><b>Example Runtime Mod</b><small>Waiting for startup report</small></div>
+          <div><span class="status-dot bad"></span><b>Loader health</b><small>UE4SS initialization failed</small></div>
+        </div>
+      </div>
+      <div class="screenshot-frame pending-shot">
+        <div class="shot-label">Real F8 overlay screenshot will be captured after the current game session.</div>
+      </div>
+    </section>
+    <section class="section feature-grid">
+      <article class="feature"><b>No Obsidian injection required</b><p>The UI is a companion process, keeping the manager usable when UE4SS itself is incompatible with a new game build.</p></article>
+      <article class="feature"><b>Global F8 toggle</b><p>Show or hide the overlay without tabbing out of the game.</p></article>
+      <article class="feature"><b>Loader diagnostics</b><p>Surface known loader initialization failures instead of silently claiming a mod is active.</p></article>
+    </section>
+  </main>
+  <footer>Obsidian Mods · Community project · Not affiliated with Mojang or Microsoft.</footer>
+</body>
+</html>

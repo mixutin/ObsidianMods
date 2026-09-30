@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Discover Minecraft Dungeons II mods on Obsidian Mods.">
+  <title>Discover · Obsidian Mods</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="discover">
+  <header class="nav">
+    <a class="brand" href="./"><span class="gem">◆</span> Obsidian <b>Mods</b></a>
+    <nav>
+      <a class="active" href="discover.html">Discover</a>
+      <a href="manager.html">Manager</a>
+      <a href="overlay.html">Overlay</a>
+      <a href="https://github.com/mixutin/ObsidianMods">GitHub</a>
+    </nav>
+  </header>
+  <main>
+    <section class="page-hero compact">
+      <div class="eyebrow">DISCOVER</div>
+      <h1>Find your next <span>mod.</span></h1>
+      <p>Verified builds for Minecraft Dungeons II, installed through Obsidian Mods Manager.</p>
+    </section>
+
+    <section class="section directory">
+      <div class="directory-tools">
+        <input id="search" type="search" placeholder="Search mods, tags, authors…">
+        <select id="category" aria-label="Category">
+          <option value="">All categories</option>
+        </select>
+        <select id="status-filter" aria-label="Compatibility status">
+          <option value="">All statuses</option>
+          <option value="stable">Stable</option>
+          <option value="experimental">Experimental</option>
+          <option value="blocked">Temporarily blocked</option>
+        </select>
+      </div>
+      <div id="catalog-stats" class="catalog-stats"></div>
+      <div id="mods" class="grid"></div>
+      <div id="empty" class="empty" hidden>No matching mods.</div>
+    </section>
+  </main>
+  <footer>Obsidian Mods · Community project · Not affiliated with Mojang or Microsoft.</footer>
+  <script src="app.js"></script>
+</body>
+</html>

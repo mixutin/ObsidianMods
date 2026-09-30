@@ -1,0 +1,52 @@
+name: Validate Obsidian catalog
+
+on:
+  pull_request:
+    paths:
+      - "docs/catalog.json"
+      - "scripts/validate_catalog.py"
+      - ".github/workflows/catalog.yml"
+  push:
+    branches: [main]
+    paths:
+      - "docs/catalog.json"
+      - "scripts/validate_catalog.py"
+      - ".github/workflows/catalog.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Validate catalog
+        run: python3 scripts/validate_catalog.py
+
+      - name: Verify published mod assets
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import urllib.request
+
+          catalog = json.load(open("docs/catalog.json"))
+          for mod in catalog["mods"]:
+              req = urllib.request.Request(
+                  mod["download_url"],
+                  headers={"User-Agent": "ObsidianMods-Catalog-CI"},
+              )
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  digest = hashlib.sha256(response.read()).hexdigest()
+              if digest.lower() != mod["sha256"].lower():
+                  raise SystemExit(
+                      f"{mod['id']}: published asset checksum mismatch "
+                      f"(catalog {mod['sha256']}, download {digest})"
+                  )
+              print(f"{mod['id']}: asset OK")
+          PY
