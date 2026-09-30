@@ -1,4 +1,4 @@
-use crate::model::{Catalog, CatalogMod, GamePaths, InstalledMod, ModKind};
+use crate::model::{Catalog, CatalogMod, GamePaths, InstalledMod, ModKind, ModProfile};
 use anyhow::{Context, Result, anyhow};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -8,6 +8,7 @@ use std::io::{Read, Write, copy};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
+use sysinfo::System;
 use walkdir::WalkDir;
 
 const APP_ID: &str = "1912410";
@@ -16,6 +17,7 @@ const CATALOG_URL: &str = "https://mixutin.github.io/ObsidianMods/catalog.json";
 
 #[derive(Default, Deserialize)]
 struct ModMeta {
+    id: Option<String>,
     name: Option<String>,
     version: Option<String>,
     author: Option<String>,
@@ -57,10 +59,6 @@ impl ModManager {
             data_root,
         };
 
-        if manager.ue4ss_installed() {
-            manager.ensure_runtime()?;
-        }
-
         Ok(manager)
     }
 
@@ -70,8 +68,71 @@ impl ModManager {
         mods.extend(self.scan_paks(&self.paths.paks_enabled, true)?);
         mods.extend(self.scan_paks(&self.paths.paks_disabled, false)?);
         mods.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        self.write_runtime_registry(&mods)?;
         Ok(mods)
+    }
+
+    pub fn profiles(&self) -> Result<Vec<ModProfile>> {
+        let dir = self.data_root.join("profiles");
+        fs::create_dir_all(&dir)?;
+        let mut profiles = Vec::new();
+
+        for entry in fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.extension().and_then(|x| x.to_str()) != Some("json") {
+                continue;
+            }
+            let text = fs::read_to_string(&path)?;
+            if let Ok(profile) = serde_json::from_str::<ModProfile>(&text) {
+                profiles.push(profile);
+            }
+        }
+
+        profiles.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        Ok(profiles)
+    }
+
+    pub fn save_profile(&self, name: &str, mods: &[InstalledMod]) -> Result<()> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err(anyhow!("Profile name cannot be empty"));
+        }
+
+        let dir = self.data_root.join("profiles");
+        fs::create_dir_all(&dir)?;
+        let profile = ModProfile {
+            name: name.to_string(),
+            mods: mods
+                .iter()
+                .map(|item| (item.id.clone(), item.enabled))
+                .collect(),
+        };
+
+        let path = dir.join(format!("{}.json", slugify(name)));
+        fs::write(path, serde_json::to_string_pretty(&profile)?)?;
+        Ok(())
+    }
+
+    pub fn apply_profile(&self, profile: &ModProfile, mods: &[InstalledMod]) -> Result<()> {
+        for item in mods {
+            if let Some(enabled) = profile.mods.get(&item.id) {
+                if *enabled != item.enabled {
+                    self.set_enabled(item, *enabled)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn delete_profile(&self, profile: &ModProfile) -> Result<()> {
+        let path = self
+            .data_root
+            .join("profiles")
+            .join(format!("{}.json", slugify(&profile.name)));
+        if path.is_file() {
+            fs::remove_file(path)?;
+        }
+        Ok(())
     }
 
     pub fn fetch_catalog(&self) -> Result<Catalog> {
@@ -88,6 +149,15 @@ impl ModManager {
     }
 
     pub fn install_catalog_mod(&self, item: &CatalogMod) -> Result<Vec<String>> {
+        if item.status.as_deref() == Some("blocked") {
+            return Err(anyhow!(
+                "{} is temporarily blocked: {}",
+                item.name,
+                item.status_note
+                    .as_deref()
+                    .unwrap_or("the current game build is not supported")
+            ));
+        }
         if !item.download_url.starts_with("https://") {
             return Err(anyhow!("Refusing a non-HTTPS mod download"));
         }
@@ -166,6 +236,7 @@ impl ModManager {
             let root = entry.path();
             let meta = read_meta(&root);
             out.push(InstalledMod {
+                id: meta.id.unwrap_or_else(|| slugify(&folder)),
                 name: meta.name.unwrap_or_else(|| folder.clone()),
                 version: meta.version,
                 author: meta.author,
@@ -209,6 +280,7 @@ impl ModManager {
         Ok(groups
             .into_iter()
             .map(|(name, files)| InstalledMod {
+                id: slugify(&name),
                 name,
                 version: None,
                 author: None,
@@ -244,10 +316,25 @@ impl ModManager {
         let mut ue4ss_roots = Vec::<PathBuf>::new();
         for entry in WalkDir::new(&cache).into_iter().filter_map(Result::ok) {
             let p = entry.path();
-            if p.is_file() && p.file_name().and_then(|x| x.to_str()) == Some("main.lua") {
+            if !p.is_file() {
+                continue;
+            }
+
+            let filename = p.file_name().and_then(|x| x.to_str());
+            if filename == Some("main.lua") {
                 if let Some(scripts) = p.parent() {
                     if scripts.file_name().and_then(|x| x.to_str()) == Some("Scripts") {
                         if let Some(root) = scripts.parent() {
+                            ue4ss_roots.push(root.to_path_buf());
+                        }
+                    }
+                }
+            }
+
+            if filename == Some("main.dll") {
+                if let Some(dlls) = p.parent() {
+                    if dlls.file_name().and_then(|x| x.to_str()) == Some("dlls") {
+                        if let Some(root) = dlls.parent() {
                             ue4ss_roots.push(root.to_path_buf());
                         }
                     }
@@ -271,6 +358,27 @@ impl ModManager {
             copy_dir(&root, &dest)?;
             self.set_ue4ss_state(&name, true)?;
             installed.push(format!("{name} (UE4SS)"));
+        }
+
+        let shared = cache.join("shared");
+        if shared.is_dir() {
+            for entry in WalkDir::new(&shared).into_iter().filter_map(Result::ok) {
+                if !entry.file_type().is_file() {
+                    continue;
+                }
+                let rel = entry.path().strip_prefix(&shared)?;
+                let dest = self.paths.ue4ss_mods.join("shared").join(rel);
+                if dest.exists() {
+                    self.backup_path(
+                        &dest,
+                        &format!("shared-{}", slugify(&rel.to_string_lossy())),
+                    )?;
+                }
+                if let Some(parent) = dest.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                fs::copy(entry.path(), &dest)?;
+            }
         }
 
         let pak_files: Vec<PathBuf> = WalkDir::new(&cache)
@@ -307,7 +415,7 @@ impl ModManager {
         let _ = fs::remove_dir_all(&cache);
         if installed.is_empty() {
             return Err(anyhow!(
-                "No UE4SS Lua mod or PAK/UTOC/UCAS mod was found in this archive"
+                "No UE4SS mod (Lua/C++) or PAK/UTOC/UCAS mod was found in this archive"
             ));
         }
         Ok(installed)
@@ -459,77 +567,55 @@ impl ModManager {
         Ok(())
     }
 
-    pub fn ensure_runtime(&self) -> Result<()> {
-        if !self.ue4ss_installed() {
-            return Ok(());
-        }
-
-        let shared = self.paths.ue4ss_mods.join("shared/ModMenu");
-        let runtime = self.paths.ue4ss_mods.join("ObsidianRuntime");
-        let scripts = runtime.join("Scripts");
-        let licenses = runtime.join("THIRD_PARTY_LICENSES");
-
-        fs::create_dir_all(&shared)?;
-        fs::create_dir_all(&scripts)?;
-        fs::create_dir_all(&licenses)?;
-
-        fs::write(
-            shared.join("ModMenu.lua"),
-            include_str!("../runtime/shared/ModMenu/ModMenu.lua"),
-        )?;
-        fs::write(
-            scripts.join("main.lua"),
-            include_str!("../runtime/ObsidianRuntime/Scripts/main.lua"),
-        )?;
-        fs::write(
-            licenses.join("ModMenu-LICENSE.txt"),
-            include_str!("../runtime/third-party/ModMenu-LICENSE.txt"),
-        )?;
-        fs::write(
-            runtime.join("obsidian-mod.json"),
-            r#"{
-  "id": "obsidian-runtime",
-  "name": "Obsidian Runtime",
-  "version": "0.2.0",
-  "author": "Obsidian Mods",
-  "description": "F8 in-game status UI installed by Obsidian Mods Manager."
-}
-"#,
-        )?;
-
-        self.set_ue4ss_state("ObsidianRuntime", true)?;
-        Ok(())
-    }
-
-    fn write_runtime_registry(&self, mods: &[InstalledMod]) -> Result<()> {
-        if !self.ue4ss_installed() {
-            return Ok(());
-        }
-
-        let runtime = self.paths.ue4ss_mods.join("ObsidianRuntime");
-        fs::create_dir_all(&runtime)?;
-        let mut registry = String::from("# id|name|version|kind|enabled\n");
-
-        for item in mods {
-            let id = slugify(&item.name);
-            let name = item.name.replace('|', "/");
-            let version = item.version.as_deref().unwrap_or("").replace('|', "/");
-            let kind = match item.kind {
-                ModKind::Ue4ss => "ue4ss",
-                ModKind::Pak => "pak",
-            };
-            registry.push_str(&format!(
-                "{id}|{name}|{version}|{kind}|{}\n",
-                if item.enabled { 1 } else { 0 }
-            ));
-        }
-
-        fs::write(runtime.join("registry.txt"), registry)?;
-        Ok(())
-    }
-
     pub fn ue4ss_installed(&self) -> bool {
         self.paths.win64.join("ue4ss/UE4SS.dll").is_file()
+    }
+
+    pub fn vanilla_mode(&self) -> bool {
+        self.paths
+            .win64
+            .join("dwmapi.obsidian-disabled.dll")
+            .is_file()
+    }
+
+    pub fn set_vanilla_mode(&self, enabled: bool) -> Result<()> {
+        let proxy = self.paths.win64.join("dwmapi.dll");
+        let disabled_proxy = self.paths.win64.join("dwmapi.obsidian-disabled.dll");
+        let disabled_paks = self
+            .paths
+            .paks_enabled
+            .with_file_name("~mods.obsidian-disabled");
+
+        if enabled {
+            if proxy.is_file() && !disabled_proxy.exists() {
+                fs::rename(&proxy, &disabled_proxy)?;
+            }
+            if self.paths.paks_enabled.is_dir() && !disabled_paks.exists() {
+                fs::rename(&self.paths.paks_enabled, &disabled_paks)?;
+            }
+            fs::create_dir_all(&self.paths.paks_enabled)?;
+        } else {
+            if disabled_proxy.is_file() {
+                if proxy.exists() {
+                    return Err(anyhow!("Cannot restore UE4SS: dwmapi.dll already exists"));
+                }
+                fs::rename(&disabled_proxy, &proxy)?;
+            }
+            if disabled_paks.is_dir() {
+                if self.paths.paks_enabled.is_dir() {
+                    let empty = fs::read_dir(&self.paths.paks_enabled)?.next().is_none();
+                    if empty {
+                        fs::remove_dir(&self.paths.paks_enabled)?;
+                    } else {
+                        return Err(anyhow!(
+                            "Cannot restore PAK mods because ~mods contains new files"
+                        ));
+                    }
+                }
+                fs::rename(&disabled_paks, &self.paths.paks_enabled)?;
+            }
+        }
+        Ok(())
     }
 
     pub fn open_game_folder(&self) -> Result<()> {
@@ -542,6 +628,11 @@ impl ModManager {
     }
 
     pub fn launch_game(&self) -> Result<()> {
+        if !overlay_running() {
+            if let Ok(exe) = std::env::current_exe() {
+                let _ = Command::new(exe).arg("--overlay").spawn();
+            }
+        }
         open_uri(&format!("steam://rungameid/{APP_ID}"))
     }
 }
@@ -689,6 +780,16 @@ fn epoch() -> u64 {
         .unwrap_or_default()
         .as_secs()
 }
+fn overlay_running() -> bool {
+    let system = System::new_all();
+    system.processes().values().any(|process| {
+        process
+            .cmd()
+            .iter()
+            .any(|arg| arg.to_string_lossy() == "--overlay")
+    })
+}
+
 fn open_path(path: &Path) -> Result<()> {
     #[cfg(target_os = "windows")]
     {

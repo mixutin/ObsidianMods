@@ -24,12 +24,16 @@ The Rust desktop manager currently supports:
 - SHA-256 verified one-click installation
 - obsidianmods://install/<id> website deep links
 - Enable, disable, uninstall and automatic backups
+- Saved mod profiles
+- Modded / Vanilla launch mode
+- F8 always-on-top mod-health overlay
 - Direct game launch
 
 ## Distribution targets
 
 GitHub Actions builds:
 
+- Windows x64 installer with obsidianmods:// protocol registration
 - Windows x64 portable ZIP
 - Linux x64 AppImage
 - Debian/Ubuntu .deb
@@ -42,8 +46,8 @@ The AppImage is the distro-independent Linux build.
 
 Catalog packages must use HTTPS and publish a SHA-256 hash. The desktop manager downloads to its local cache, verifies the complete archive, and only then installs it.
 
-## In-game runtime
+## In-game overlay
 
-The Obsidian Runtime is a compiled UE4SS C++ component kept in the private build repository. Its planned in-game panel reports enabled, disabled, loaded and failed UE4SS mods and lists installed PAK mods.
+The manager can launch an F8 overlay alongside Minecraft Dungeons II. It is a separate always-on-top process rather than an injected game component, so the Obsidian UI does not depend on UE4SS successfully initializing. The overlay reports managed mod state and loader failures while the game is running.
 
-The public website never contains individual mod source code.
+Experimental mod implementation source stays in the private build repository. Public mod releases contain only packaged builds, metadata and checksums. The public website never contains individual mod source code.

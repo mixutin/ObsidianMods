@@ -16,7 +16,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Build
         run: cargo build --release
-      - name: Package
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress
+          $match = Select-String -Path Cargo.toml -Pattern '^version = "([^"]+)"' | Select-Object -First 1
+          $version = $match.Matches[0].Groups[1].Value
+          & "$env:ProgramFiles(x86)\NSIS\makensis.exe" "/DAPP_VERSION=$version" assets/windows-installer.nsi
+      - name: Package portable build
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
@@ -25,7 +32,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: ObsidianModsManager-Windows-x64.zip
+          path: |
+            ObsidianModsManager-Windows-x64.zip
+            ObsidianModsManager-Setup.exe
 
   linux:
     runs-on: ubuntu-24.04
@@ -48,10 +57,9 @@ jobs:
       - name: Build deb and rpm
         run: |
           sudo gem install fpm --no-document
-          fpm -s dir -t deb -n obsidian-mods-manager -v 0.2.0 --description "Obsidian Mods Manager for Minecraft Dungeons II" -C pkg .
-          fpm -s dir -t rpm -n obsidian-mods-manager -v 0.2.0 --description "Obsidian Mods Manager for Minecraft Dungeons II" -C pkg .
-          mv obsidian-mods-manager_0.2.0_amd64.deb ObsidianModsManager-Linux-x64.deb
-          mv obsidian-mods-manager-0.2.0-1.x86_64.rpm ObsidianModsManager-Linux-x64.rpm
+          VERSION=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -1)
+          fpm -s dir -t deb -n obsidian-mods-manager -v "$VERSION" -p ObsidianModsManager-Linux-x64.deb --description "Obsidian Mods Manager for Minecraft Dungeons II" -C pkg .
+          fpm -s dir -t rpm -n obsidian-mods-manager -v "$VERSION" -p ObsidianModsManager-Linux-x64.rpm --description "Obsidian Mods Manager for Minecraft Dungeons II" -C pkg .
       - name: Build AppImage
         run: |
           wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
@@ -77,6 +85,10 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}

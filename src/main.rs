@@ -1,9 +1,10 @@
 mod manager;
 mod model;
+mod overlay;
 
 use eframe::egui;
 use manager::ModManager;
-use model::{CatalogMod, InstalledMod, ModKind};
+use model::{CatalogMod, InstalledMod, ModKind, ModProfile};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -12,6 +13,7 @@ use std::process::Command;
 enum View {
     Discover,
     Installed,
+    Profiles,
 }
 
 enum Action {
@@ -21,6 +23,10 @@ enum Action {
     InstallCatalog(usize),
     Refresh,
     RefreshCatalog,
+    SaveProfile,
+    ApplyProfile(usize),
+    DeleteProfile(usize),
+    SetVanilla(bool),
     Launch,
     OpenGame,
     OpenMods,
@@ -30,6 +36,9 @@ struct ObsidianApp {
     manager: Option<ModManager>,
     mods: Vec<InstalledMod>,
     catalog: Vec<CatalogMod>,
+    profiles: Vec<ModProfile>,
+    profile_name: String,
+    catalog_updated: String,
     view: View,
     status: String,
     pending_remove: Option<usize>,
@@ -45,6 +54,9 @@ impl ObsidianApp {
             manager: None,
             mods: Vec::new(),
             catalog: Vec::new(),
+            profiles: Vec::new(),
+            profile_name: String::new(),
+            catalog_updated: String::new(),
             view: View::Discover,
             status: "Detecting Minecraft Dungeons II…".into(),
             pending_remove: None,
@@ -53,6 +65,7 @@ impl ObsidianApp {
             Ok(manager) => {
                 app.manager = Some(manager);
                 app.refresh();
+                app.refresh_profiles();
                 app.refresh_catalog();
             }
             Err(err) => app.status = format!("Game detection failed: {err}"),
@@ -75,10 +88,19 @@ impl ObsidianApp {
         }
     }
 
+    fn refresh_profiles(&mut self) {
+        let Some(manager) = &self.manager else { return };
+        match manager.profiles() {
+            Ok(profiles) => self.profiles = profiles,
+            Err(err) => self.status = format!("Could not load profiles: {err}"),
+        }
+    }
+
     fn refresh_catalog(&mut self) {
         let Some(manager) = &self.manager else { return };
         match manager.fetch_catalog() {
             Ok(catalog) => {
+                self.catalog_updated = catalog.generated_at;
                 self.catalog = catalog.mods;
                 self.status = format!("Discover ready · {} catalog mods", self.catalog.len());
             }
@@ -120,6 +142,59 @@ impl ObsidianApp {
             Action::RefreshCatalog => self.refresh_catalog(),
             Action::Install(path) => self.install(&path),
             Action::InstallCatalog(index) => self.install_catalog(index),
+            Action::SaveProfile => {
+                if let Some(manager) = &self.manager {
+                    match manager.save_profile(&self.profile_name, &self.mods) {
+                        Ok(()) => {
+                            self.status = format!("Saved profile {}", self.profile_name.trim());
+                            self.profile_name.clear();
+                            self.refresh_profiles();
+                        }
+                        Err(err) => self.status = format!("Could not save profile: {err}"),
+                    }
+                }
+            }
+            Action::ApplyProfile(index) => {
+                if let (Some(manager), Some(profile)) =
+                    (self.manager.as_ref(), self.profiles.get(index).cloned())
+                {
+                    match manager.apply_profile(&profile, &self.mods) {
+                        Ok(()) => {
+                            self.status = format!("Applied profile {}", profile.name);
+                            self.refresh();
+                        }
+                        Err(err) => self.status = format!("Could not apply profile: {err}"),
+                    }
+                }
+            }
+            Action::DeleteProfile(index) => {
+                if let (Some(manager), Some(profile)) =
+                    (self.manager.as_ref(), self.profiles.get(index).cloned())
+                {
+                    match manager.delete_profile(&profile) {
+                        Ok(()) => {
+                            self.status = format!("Deleted profile {}", profile.name);
+                            self.refresh_profiles();
+                        }
+                        Err(err) => self.status = format!("Could not delete profile: {err}"),
+                    }
+                }
+            }
+            Action::SetVanilla(enabled) => {
+                if let Some(m) = &self.manager {
+                    match m.set_vanilla_mode(enabled) {
+                        Ok(()) => {
+                            self.status = if enabled {
+                                "Vanilla mode enabled · UE4SS and PAK mods are bypassed".into()
+                            } else {
+                                "Modded mode restored".into()
+                            };
+                            self.refresh();
+                        }
+                        Err(e) => self.status = format!("Could not change launch mode: {e}"),
+                    }
+                }
+            }
             Action::Launch => {
                 if let Some(m) = &self.manager {
                     if let Err(e) = m.launch_game() {
@@ -192,6 +267,11 @@ impl eframe::App for ObsidianApp {
             self.install(&path);
         }
         let mut action = None;
+        let vanilla_mode = self
+            .manager
+            .as_ref()
+            .map(|m| m.vanilla_mode())
+            .unwrap_or(false);
 
         egui::TopBottomPanel::top("header").show(ctx, |ui| {
             ui.add_space(10.0);
@@ -205,6 +285,13 @@ impl eframe::App for ObsidianApp {
                 );
                 ui.separator();
                 ui.label(egui::RichText::new("Manager · Minecraft Dungeons II").weak());
+                ui.separator();
+                if ui.selectable_label(!vanilla_mode, "MODDED").clicked() {
+                    action = Some(Action::SetVanilla(false));
+                }
+                if ui.selectable_label(vanilla_mode, "VANILLA").clicked() {
+                    action = Some(Action::SetVanilla(true));
+                }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.button("▶ Launch").clicked() {
                         action = Some(Action::Launch);
@@ -226,6 +313,10 @@ impl eframe::App for ObsidianApp {
             }
             if ui.selectable_label(self.view == View::Installed, "☰ Installed").clicked() {
                 self.view = View::Installed;
+            }
+            if ui.selectable_label(self.view == View::Profiles, "◈ Profiles").clicked() {
+                self.view = View::Profiles;
+                self.refresh_profiles();
             }
             ui.add_space(12.0);
             ui.separator();
@@ -287,6 +378,9 @@ impl eframe::App for ObsidianApp {
                     )
                     .weak(),
                 );
+                if !self.catalog_updated.is_empty() {
+                    ui.small(format!("Catalog updated {}", self.catalog_updated));
+                }
                 ui.add_space(10.0);
 
                 if self.catalog.is_empty() {
@@ -325,12 +419,36 @@ impl eframe::App for ObsidianApp {
                                                 );
                                             });
                                             ui.small(format!(
-                                                "v{} · {} · {}",
-                                                item.version, item.author, item.loader
+                                                "v{} · {} · {} · game build {}",
+                                                item.version,
+                                                item.author,
+                                                item.loader,
+                                                item.game_build
                                             ));
-                                            ui.label(&item.summary);
+                                            ui.label(&item.summary)
+                                                .on_hover_text(&item.description);
                                             if !item.tags.is_empty() {
                                                 ui.small(item.tags.join(" · "));
+                                            }
+                                            if !item.dependencies.is_empty() {
+                                                ui.small(format!(
+                                                    "{} dependenc{}",
+                                                    item.dependencies.len(),
+                                                    if item.dependencies.len() == 1 { "y" } else { "ies" }
+                                                ));
+                                            }
+                                            if !item.screenshots.is_empty() {
+                                                ui.small(format!(
+                                                    "{} screenshot{}",
+                                                    item.screenshots.len(),
+                                                    if item.screenshots.len() == 1 { "" } else { "s" }
+                                                ));
+                                            }
+                                            if let Some(note) = &item.status_note {
+                                                ui.small(
+                                                    egui::RichText::new(note)
+                                                        .color(egui::Color32::from_rgb(235, 178, 82)),
+                                                );
                                             }
                                         });
                                         ui.with_layout(
@@ -342,8 +460,89 @@ impl eframe::App for ObsidianApp {
                                                             egui::Color32::from_rgb(117, 214, 140),
                                                         ),
                                                     );
+                                                } else if item.status.as_deref() == Some("blocked") {
+                                                    ui.label(
+                                                        egui::RichText::new("Temporarily blocked")
+                                                            .color(egui::Color32::from_rgb(
+                                                                235, 105, 105,
+                                                            )),
+                                                    );
                                                 } else if ui.button("Install").clicked() {
                                                     action = Some(Action::InstallCatalog(index));
+                                                }
+                                            },
+                                        );
+                                    });
+                                });
+                                ui.add_space(7.0);
+                            }
+                        });
+                }
+                return;
+            }
+
+            if self.view == View::Profiles {
+                ui.horizontal(|ui| {
+                    ui.heading("Profiles");
+                    ui.label(
+                        egui::RichText::new(format!("{} saved", self.profiles.len())).weak(),
+                    );
+                });
+                ui.label(
+                    egui::RichText::new(
+                        "Save different mod sets and switch between them without reinstalling anything.",
+                    )
+                    .weak(),
+                );
+                ui.add_space(12.0);
+
+                ui.horizontal(|ui| {
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.profile_name)
+                            .hint_text("Profile name")
+                            .desired_width(260.0),
+                    );
+                    let can_save = !self.profile_name.trim().is_empty();
+                    if ui
+                        .add_enabled(can_save, egui::Button::new("Save current mod set"))
+                        .clicked()
+                    {
+                        action = Some(Action::SaveProfile);
+                    }
+                });
+                ui.add_space(14.0);
+
+                if self.profiles.is_empty() {
+                    ui.add_space(30.0);
+                    ui.vertical_centered(|ui| {
+                        ui.heading("No profiles yet");
+                        ui.label("Save your current enabled/disabled mod set above.");
+                    });
+                } else {
+                    egui::ScrollArea::vertical()
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            for (index, profile) in self.profiles.iter().enumerate() {
+                                let enabled = profile.mods.values().filter(|value| **value).count();
+                                let total = profile.mods.len();
+                                egui::Frame::group(ui.style()).show(ui, |ui| {
+                                    ui.horizontal(|ui| {
+                                        ui.vertical(|ui| {
+                                            ui.label(
+                                                egui::RichText::new(&profile.name)
+                                                    .size(17.0)
+                                                    .strong(),
+                                            );
+                                            ui.small(format!("{enabled} enabled · {total} tracked"));
+                                        });
+                                        ui.with_layout(
+                                            egui::Layout::right_to_left(egui::Align::Center),
+                                            |ui| {
+                                                if ui.button("Delete").clicked() {
+                                                    action = Some(Action::DeleteProfile(index));
+                                                }
+                                                if ui.button("Apply").clicked() {
+                                                    action = Some(Action::ApplyProfile(index));
                                                 }
                                             },
                                         );
@@ -434,7 +633,10 @@ impl eframe::App for ObsidianApp {
                 ui.label(egui::RichText::new("●").color(egui::Color32::from_rgb(157, 120, 255)));
                 ui.label(&self.status);
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.small("Obsidian Mods Manager 0.2.0");
+                    ui.small(format!(
+                        "Obsidian Mods Manager {}",
+                        env!("CARGO_PKG_VERSION")
+                    ));
                 });
             });
         });
@@ -471,7 +673,10 @@ impl eframe::App for ObsidianApp {
 }
 
 fn register_protocol_handler() {
-    let Ok(exe) = std::env::current_exe() else {
+    let exe = std::env::var_os("APPIMAGE")
+        .map(PathBuf::from)
+        .or_else(|| std::env::current_exe().ok());
+    let Some(exe) = exe else {
         return;
     };
 
@@ -517,6 +722,47 @@ fn register_protocol_handler() {
 fn main() -> eframe::Result<()> {
     register_protocol_handler();
     let args: Vec<String> = std::env::args().collect();
+
+    if args
+        .iter()
+        .any(|arg| arg == "--overlay" || arg == "--overlay-open")
+    {
+        let start_visible = args.iter().any(|arg| arg == "--overlay-open");
+        return overlay::run(start_visible);
+    }
+
+    if let Some(index) = args.iter().position(|arg| arg == "--install-zip") {
+        if let Some(path) = args.get(index + 1) {
+            match ModManager::detect() {
+                Ok(manager) => match manager.install_archive(std::path::Path::new(path)) {
+                    Ok(items) => println!("Installed {}", items.join(", ")),
+                    Err(err) => eprintln!("Install failed: {err}"),
+                },
+                Err(err) => eprintln!("Game detection failed: {err}"),
+            }
+        } else {
+            eprintln!("--install-zip requires a .zip path");
+        }
+        return Ok(());
+    }
+
+    if args
+        .iter()
+        .any(|arg| arg == "--vanilla" || arg == "--modded")
+    {
+        let vanilla = args.iter().any(|arg| arg == "--vanilla");
+        match ModManager::detect() {
+            Ok(manager) => match manager.set_vanilla_mode(vanilla) {
+                Ok(()) => println!(
+                    "{} mode enabled",
+                    if vanilla { "Vanilla" } else { "Modded" }
+                ),
+                Err(err) => eprintln!("Could not change launch mode: {err}"),
+            },
+            Err(err) => eprintln!("Game detection failed: {err}"),
+        }
+        return Ok(());
+    }
 
     if args.iter().any(|arg| arg == "--list") {
         match ModManager::detect() {

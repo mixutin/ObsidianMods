@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -17,6 +18,7 @@ impl ModKind {
 
 #[derive(Clone, Debug)]
 pub struct InstalledMod {
+    pub id: String,
     pub name: String,
     pub version: Option<String>,
     pub author: Option<String>,
@@ -63,4 +65,16 @@ pub struct CatalogMod {
     pub tags: Vec<String>,
     #[serde(default)]
     pub featured: bool,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub status_note: Option<String>,
+    #[serde(default)]
+    pub screenshots: Vec<String>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ModProfile {
+    pub name: String,
+    pub mods: BTreeMap<String, bool>,
 }
