@@ -54,7 +54,7 @@ The manager handles the annoying parts — game detection, package verification,
 | Windows manager | ✅ |
 | Linux manager | ✅ |
 | Automatic mod updates | 🚧 |
-| Native Cutscene FPS Unlock | 🧪 Experimental |
+| Native Cutscene FPS Unlock | ⛔ Temporarily blocked while the safe cutscene-only patch is developed |
 
 ## In-game F8 menu
 

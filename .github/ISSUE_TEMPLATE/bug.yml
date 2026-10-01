@@ -1,0 +1,43 @@
+name: Bug report
+description: Report a problem with Obsidian Mods Manager, the website, or native runtime
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Manager
+        - Native runtime / F8 menu
+        - Website / Discover
+        - Mod installation
+        - Linux / Proton compatibility
+        - Windows compatibility
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Obsidian version
+      placeholder: e.g. Manager 0.3.0 / Runtime 0.2.3
+    validations:
+      required: true
+  - type: input
+    id: game
+    attributes:
+      label: Minecraft Dungeons II build
+      placeholder: e.g. 25041023
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Include exact steps and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Paste relevant Obsidian runtime/manager logs. Remove personal information first.
+      render: text

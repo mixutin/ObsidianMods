@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest a manager, website, runtime, or mod-platform improvement
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Manager
+        - Discover website
+        - Native in-game menu
+        - Mod packaging
+        - Profiles / updates
+        - Windows
+        - Linux / Proton
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Proposed solution
+      description: Describe the workflow or UI you would like to see.
+    validations:
+      required: true
