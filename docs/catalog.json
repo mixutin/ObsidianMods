@@ -1,21 +1,21 @@
 {
   "schema": 1,
-  "generated_at": "2026-10-01T11:38:16+03:00",
+  "generated_at": "2026-10-01T12:31:04+03:00",
   "mods": [
     {
       "id": "cutscene-fps-unlock",
       "name": "Cutscene FPS Unlock",
-      "version": "0.2.1",
+      "version": "0.2.3",
       "author": "Obsidian Mods",
       "summary": "Native FPS unlock for Minecraft Dungeons II gameplay and cutscenes.",
-      "description": "Experimental native frame-rate unlock. Intercepts the game frame-rate-limit setter through Obsidian Native Runtime without UE4SS.",
+      "description": "Native Minecraft Dungeons II FPS unlock research build. Global frame-limit interception is currently disabled while a safer cutscene-only data patch is developed.",
       "category": "Performance",
       "loader": "obsidian-native",
       "game_build": "25041023",
-      "download_url": "https://github.com/mixutin/ObsidianMods-Builds/releases/download/cutscene-fps-native-v0.2.1/CutsceneFPSUnlock-Native-0.2.1.zip",
-      "sha256": "8a4442d8f284cfb8772331dca340492f1100e07837bc2170ece38f595d82d629",
+      "download_url": "https://github.com/mixutin/ObsidianMods-Builds/releases/download/cutscene-fps-native-v0.2.3/CutsceneFPSUnlock-Native-0.2.3.zip",
+      "sha256": "a8e56aea7e33f72d39812c844738872c4dbc9353949ea454527d8102fd35246e",
       "dependencies": [
-        "Obsidian Native Runtime >= 0.2.0"
+        "Obsidian Native Runtime >= 0.2.3"
       ],
       "tags": [
         "FPS",
@@ -26,8 +26,8 @@
         "Windows"
       ],
       "featured": true,
-      "status": "experimental",
-      "status_note": "Native telemetry build: forces UGameUserSettings frame-rate-limit writes to unlimited and logs requested caps; cutscene-specific pacing is still being validated.",
+      "status": "blocked",
+      "status_note": "Temporarily blocked: global frame-limit hooks/patches exit the current Dungeons II build. A cutscene-only data-level unlock is under development.",
       "screenshots": []
     }
   ]
