@@ -3,9 +3,49 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="description" content="Obsidian Mods — one-click Minecraft Dungeons II mods and a cross-platform mod manager.">
-  <title>Obsidian Mods</title>
+  <meta name="description" content="Download and manage Minecraft Dungeons II (Dungeons 2) mods with Obsidian Mods — one-click installs, Windows/Linux manager, native F8 menu and verified builds.">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="theme-color" content="#09090d">
+  <link rel="canonical" href="https://mixutin.github.io/ObsidianMods/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Obsidian Mods">
+  <meta property="og:title" content="Minecraft Dungeons II Mods & Mod Manager | Obsidian Mods">
+  <meta property="og:description" content="Discover, install and manage Minecraft Dungeons II mods on Windows and Linux.">
+  <meta property="og:url" content="https://mixutin.github.io/ObsidianMods/">
+  <meta name="twitter:card" content="summary_large_image">
+  <title>Minecraft Dungeons II Mods & Mod Manager | Obsidian Mods</title>
   <link rel="stylesheet" href="styles.css">
+  <script type="application/ld+json">
+  {
+    "@context":"https://schema.org",
+    "@graph":[
+      {
+        "@type":"WebSite",
+        "name":"Obsidian Mods",
+        "url":"https://mixutin.github.io/ObsidianMods/",
+        "description":"Minecraft Dungeons II mods, mod manager and native in-game mod menu."
+      },
+      {
+        "@type":"SoftwareApplication",
+        "name":"Obsidian Mods Manager",
+        "applicationCategory":"GameApplication",
+        "operatingSystem":"Windows, Linux",
+        "url":"https://mixutin.github.io/ObsidianMods/manager.html",
+        "downloadUrl":"https://github.com/mixutin/ObsidianMods/releases/latest",
+        "description":"Cross-platform Minecraft Dungeons II mod manager with one-click installs, profiles, backups and native mod support."
+      },
+      {
+        "@type":"FAQPage",
+        "mainEntity":[
+          {"@type":"Question","name":"Where can I download Minecraft Dungeons II mods?","acceptedAnswer":{"@type":"Answer","text":"Use the Obsidian Mods Discover directory to browse verified Minecraft Dungeons II mod builds and install supported mods with one click."}},
+          {"@type":"Question","name":"Is there a Minecraft Dungeons II mod manager?","acceptedAnswer":{"@type":"Answer","text":"Yes. Obsidian Mods Manager supports Windows and Linux, native Obsidian plugins, PAK and IoStore packages, and UE4SS-compatible mods."}},
+          {"@type":"Question","name":"Does Obsidian Mods work on Linux?","acceptedAnswer":{"@type":"Answer","text":"Yes. Obsidian Mods Manager supports Linux and Minecraft Dungeons II running through Proton, alongside Windows."}},
+          {"@type":"Question","name":"How do I open the Obsidian Mods menu in-game?","acceptedAnswer":{"@type":"Answer","text":"Press F8. Obsidian Native Runtime renders the menu directly inside Minecraft Dungeons II."}}
+        ]
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
   <header class="nav">
@@ -22,10 +62,11 @@
     <section class="hero">
       <div class="eyebrow">MINECRAFT DUNGEONS II MODDING</div>
       <h1>Mods without the<br><span>folder archaeology.</span></h1>
-      <p>Discover verified builds, install in one click, manage conflicts and see mod health in-game.</p>
+      <p>Discover verified Minecraft Dungeons II mods (Dungeons 2 mods), install them in one click, manage conflicts and see mod health in-game.</p>
       <div class="actions">
         <a class="primary" href="manager.html">Get Obsidian Manager</a>
-        <a class="secondary" href="discover.html">Browse mods</a>
+        <a class="secondary" href="discover.html">Browse Dungeons II mods</a>
+        <a class="secondary" href="https://github.com/mixutin/ObsidianMods">⭐ Star on GitHub</a>
       </div>
       <div class="trust">
         <span>✓ SHA-256 verified</span>
@@ -77,9 +118,27 @@
         </div>
       </div>
     </section>
+
+    <section class="section faq" id="faq">
+      <div class="eyebrow">MINECRAFT DUNGEONS II MODDING FAQ</div>
+      <h2>Dungeons 2 mods, without the guesswork.</h2>
+      <details><summary>Where can I download Minecraft Dungeons II mods?</summary><p>Use the Obsidian Mods Discover directory to browse verified Minecraft Dungeons II mod builds and install supported mods with one click.</p></details>
+      <details><summary>Is there a Minecraft Dungeons II mod manager?</summary><p>Yes. Obsidian Mods Manager supports Windows and Linux, including native Obsidian plugins, PAK/IoStore packages and UE4SS-compatible mods.</p></details>
+      <details><summary>Does Obsidian Mods work on Linux?</summary><p>Yes. The manager supports Linux builds and Minecraft Dungeons II running through Proton, alongside Windows.</p></details>
+      <details><summary>How do I open the Obsidian Mods menu in-game?</summary><p>Press F8. Obsidian Native Runtime renders the menu directly inside Minecraft Dungeons II and reports mod/runtime health.</p></details>
+    </section>
+
+    <section class="section star-cta">
+      <div>
+        <div class="eyebrow">SUPPORT THE PROJECT</div>
+        <h2>Want more Dungeons II mods?</h2>
+        <p>If Obsidian Mods helps you, ⭐ starring the GitHub repo genuinely motivates me to keep building more mods, compatibility fixes and manager features.</p>
+      </div>
+      <a class="primary" href="https://github.com/mixutin/ObsidianMods">⭐ Star Obsidian Mods</a>
+    </section>
   </main>
 
-  <footer>Obsidian Mods · Community project · Not affiliated with Mojang or Microsoft.</footer>
+  <footer>Obsidian Mods · Community project · Not affiliated with Mojang or Microsoft. · <a href="https://github.com/mixutin/ObsidianMods">Star the repo ⭐</a></footer>
   <script src="app.js"></script>
 </body>
 </html>

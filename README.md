@@ -11,6 +11,10 @@ Discover, install, update and manage mods from one native app — with a real **
 [Download Manager](https://mixutin.github.io/ObsidianMods/manager.html) ·
 [GitHub Releases](https://github.com/mixutin/ObsidianMods/releases)
 
+**⭐ If Obsidian Mods helps you, please star the repository. It genuinely motivates me to keep building more Minecraft Dungeons II mods, compatibility fixes and manager features.**
+
+[![GitHub stars](https://img.shields.io/github/stars/mixutin/ObsidianMods?style=social)](https://github.com/mixutin/ObsidianMods/stargazers)
+
 ![CI](https://github.com/mixutin/ObsidianMods/actions/workflows/ci.yml/badge.svg)
 ![Catalog](https://github.com/mixutin/ObsidianMods/actions/workflows/catalog.yml/badge.svg)
 ![Windows](https://img.shields.io/badge/Windows-10%20%2F%2011-6f42c1)

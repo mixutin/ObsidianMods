@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "docs/**"
+      - "scripts/generate_seo_pages.py"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -25,6 +26,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Generate SEO mod pages and sitemap
+        run: python3 scripts/generate_seo_pages.py
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

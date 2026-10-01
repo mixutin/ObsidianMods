@@ -28,7 +28,7 @@ function modCard(mod) {
   return `
     <article class="card ${mod.featured ? "featured" : ""}">
       <div class="card-top">
-        <a class="card-title" href="mod.html?id=${encodeURIComponent(mod.id)}">
+        <a class="card-title" href="mods/${encodeURIComponent(mod.id)}/">
           <h3>${escapeHtml(mod.name)}</h3>
         </a>
         <span class="pill">${escapeHtml(mod.category.toUpperCase())}</span>
@@ -39,7 +39,7 @@ function modCard(mod) {
       <div class="tags">${tags}</div>
       ${mod.status_note ? `<div class="status-note">${escapeHtml(mod.status_note)}</div>` : ""}
       <div class="card-actions">
-        <a class="secondary small" href="mod.html?id=${encodeURIComponent(mod.id)}">Details</a>
+        <a class="secondary small" href="mods/${encodeURIComponent(mod.id)}/">Details</a>
         <button class="install" data-id="${escapeHtml(mod.id)}" ${blocked ? "disabled" : ""}>
           ${blocked ? "Unavailable" : "Install with Obsidian"}
         </button>

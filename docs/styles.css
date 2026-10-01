@@ -311,3 +311,27 @@ select {
 @media (max-width: 850px) {
   .download-grid { grid-template-columns: 1fr; }
 }
+
+.faq { max-width: 940px; }
+.faq h2 { margin-bottom: 26px; }
+.faq details {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  padding: 16px 18px;
+  margin-top: 10px;
+}
+.faq summary { cursor: pointer; font-weight: 750; }
+.faq details p { color: var(--muted); margin-bottom: 0; }
+.star-cta, .star-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  border-top: 1px solid #ffffff0a;
+}
+.star-cta p, .star-inline p { max-width: 720px; color: var(--muted); }
+.star-inline { margin-top: 56px; padding-top: 36px; }
+@media (max-width: 850px) {
+  .star-cta, .star-inline { align-items: flex-start; flex-direction: column; }
+}

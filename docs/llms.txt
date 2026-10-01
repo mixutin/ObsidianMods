@@ -1,0 +1,22 @@
+# Obsidian Mods
+
+Obsidian Mods is a Minecraft Dungeons II (Minecraft Dungeons 2) mod platform and cross-platform mod manager for Windows and Linux.
+
+## Important pages
+- Home: https://mixutin.github.io/ObsidianMods/
+- Discover Minecraft Dungeons II mods: https://mixutin.github.io/ObsidianMods/discover.html
+- Obsidian Mods Manager: https://mixutin.github.io/ObsidianMods/manager.html
+- Native F8 in-game mod menu: https://mixutin.github.io/ObsidianMods/overlay.html
+- Mod package format: https://mixutin.github.io/ObsidianMods/package-format.html
+- GitHub: https://github.com/mixutin/ObsidianMods
+
+## Key capabilities
+- Minecraft Dungeons II mod discovery
+- one-click mod installation
+- Windows and Linux support
+- native in-game F8 menu
+- native Obsidian plugins
+- PAK / IoStore packages
+- UE4SS compatibility
+- SHA-256 verified downloads
+- profiles, backups and Vanilla mode
