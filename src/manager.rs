@@ -31,6 +31,7 @@ struct ModMeta {
     author: Option<String>,
     description: Option<String>,
     loader: Option<String>,
+    runtime: Option<String>,
 }
 
 #[derive(Clone, Deserialize, serde::Serialize)]
@@ -617,6 +618,24 @@ impl ModManager {
                 .clone()
                 .ok_or_else(|| anyhow!("Native Obsidian packages require an id"))?;
             let display_name = package_meta.name.clone().unwrap_or_else(|| id.clone());
+
+            if let Some(requirement) = package_meta.runtime.as_deref() {
+                let current = self.native_runtime_version().ok_or_else(|| {
+                    anyhow!(
+                        "{} requires Obsidian Native Runtime {}, but no runtime version is installed",
+                        display_name,
+                        requirement
+                    )
+                })?;
+                if !runtime_requirement_satisfied(&current, requirement) {
+                    return Err(anyhow!(
+                        "{} requires Obsidian Native Runtime {}, but {} is installed",
+                        display_name,
+                        requirement,
+                        current
+                    ));
+                }
+            }
 
             let dlls: Vec<PathBuf> = WalkDir::new(&cache)
                 .into_iter()
@@ -1291,6 +1310,30 @@ fn copy_dir(from: &Path, to: &Path) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn parse_version(value: &str) -> Option<(u64, u64, u64)> {
+    let value = value.trim().trim_start_matches('v');
+    let mut parts = value.split('.');
+    let major = parts.next()?.parse().ok()?;
+    let minor = parts.next().unwrap_or("0").parse().ok()?;
+    let patch = parts
+        .next()
+        .unwrap_or("0")
+        .split(|ch: char| !ch.is_ascii_digit())
+        .next()
+        .unwrap_or("0")
+        .parse()
+        .ok()?;
+    Some((major, minor, patch))
+}
+
+fn runtime_requirement_satisfied(current: &str, requirement: &str) -> bool {
+    let minimum = requirement.trim().strip_prefix(">=").unwrap_or(requirement);
+    match (parse_version(current), parse_version(minimum)) {
+        (Some(current), Some(minimum)) => current >= minimum,
+        _ => false,
+    }
 }
 
 fn slugify(value: &str) -> String {
