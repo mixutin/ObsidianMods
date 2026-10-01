@@ -662,6 +662,28 @@ impl ModManager {
                 fs::copy(&package_manifest, dest.join("obsidian-mod.json"))?;
             }
 
+            if self.paths.ue4ss_mods.is_dir() {
+                for entry in fs::read_dir(&self.paths.ue4ss_mods)? {
+                    let entry = entry?;
+                    if !entry.file_type()?.is_dir() {
+                        continue;
+                    }
+
+                    let root = entry.path();
+                    let legacy_meta = read_meta(&root);
+                    let same_id = legacy_meta.id.as_deref() == Some(id.as_str());
+                    let same_name = legacy_meta
+                        .name
+                        .as_deref()
+                        .map(|name| name.eq_ignore_ascii_case(&display_name))
+                        .unwrap_or(false);
+                    if same_id || same_name {
+                        let folder = entry.file_name().to_string_lossy().to_string();
+                        self.set_ue4ss_state(&folder, false)?;
+                    }
+                }
+            }
+
             let _ = fs::remove_dir_all(&cache);
             return Ok(vec![format!("{display_name} (Native)")]);
         }
